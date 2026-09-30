@@ -1,0 +1,27 @@
+# Template file for 'cosmic-osd'
+pkgname=cosmic-osd
+version=1.9.0
+revision=1
+archs="x86_64*"
+build_style=cargo
+configure_args="--workspace"
+hostmakedepends="pkg-config just"
+makedepends="libxkbcommon-devel pulseaudio-devel pipewire-devel clang22-devel eudev-libudev-devel libinput-devel"
+depends="dbus-libs eudev-libudev lame libinput libpipewire libpulseaudio libxkbcommon libsndfile libxcb libasyncns libflac libvorbis libogg libmpg123 libXau libXdmcp opus sound-theme-freedesktop wayland"
+short_desc="COSMIC OSD"
+maintainer="Bella109 <belladev109@proton.me>"
+license="GPL-3.0-only"
+homepage="https://github.com/pop-os/cosmic-osd"
+distfiles="https://github.com/pop-os/cosmic-osd/archive/refs/tags/epoch-${version}.tar.gz"
+checksum=7f4e7e991f9201bacb0d0c3c47d160419de849710f16c9deb29a3aaeb82b0de3
+
+# Void installs polkit's helper at /usr/lib/polkit-1/, but cosmic-osd's
+# fallback (used since there's no systemd socket activation) is hardcoded
+# to /usr/libexec/polkit-agent-helper-1 via option_env!, which breaks
+# authentication. Point it at the real path, same pattern as GEOCLUE_AGENT
+# in cosmic-settings-daemon.
+export POLKIT_AGENT_HELPER_1="/usr/lib/polkit-1/polkit-agent-helper-1"
+
+do_install() {
+	just rootdir="${DESTDIR}" cargo-target-dir="target/${RUST_TARGET}" install
+}

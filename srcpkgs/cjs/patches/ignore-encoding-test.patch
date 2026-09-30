@@ -1,0 +1,11 @@
+broken on musl
+--- a/installed-tests/js/meson.build
++++ b/installed-tests/js/meson.build
+@@ -23,7 +23,6 @@
+     'AsyncMainloop',
+     'Cairo',
+     'Console',
+-    'Encoding',
+     'ESModules',
+     'Exceptions',
+     'Fundamental',

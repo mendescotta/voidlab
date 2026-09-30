@@ -1,0 +1,25 @@
+#!/bin/sh
+# gsd-xsettings is an X11 client. Under systemd, gnome-shell starts it via
+# gnome-session-x11-services-ready.target once Xwayland is up, and systemd
+# hands it DISPLAY/XAUTHORITY from the activation environment. Without
+# systemd that call is a no-op (see gnome-shell's _startX11Services), so
+# find the display mutter reserved ourselves: the lowest-numbered
+# /tmp/.X*-lock holding this session's gnome-shell pid. The other one is
+# mutter's private display for managed services.
+exec 2>&1
+shell_pid=$(cat ../gnome-shell/supervise/pid 2>/dev/null)
+[ -n "$shell_pid" ] || exec sleep 1
+for lock in $(ls /tmp/.X*-lock 2>/dev/null | sort -V); do
+	[ "$(tr -d ' \n' < "$lock")" = "$shell_pid" ] || continue
+	n=${lock#/tmp/.X}
+	DISPLAY=:${n%-lock}
+	break
+done
+[ -n "$DISPLAY" ] || exec sleep 1
+# Take the auth file from this session's Xwayland; stale ones from earlier
+# gnome-shell runs linger in XDG_RUNTIME_DIR, so newest-file is a fallback.
+xwl_pid=$(pgrep -P "$shell_pid" -x Xwayland | head -n1)
+[ -n "$xwl_pid" ] && XAUTHORITY=$(tr '\0' '\n' < /proc/$xwl_pid/cmdline | sed -n '/^-auth$/{n;p;q}')
+[ -n "$XAUTHORITY" ] || XAUTHORITY=$(ls -t "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/.mutter-Xwaylandauth.* 2>/dev/null | head -n1)
+export DISPLAY XAUTHORITY
+exec /usr/libexec/gsd-xsettings

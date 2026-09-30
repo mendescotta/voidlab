@@ -1,0 +1,313 @@
+Depends on 01-systemd-optional.patch (introduces get_option('systemd')).
+
+Supply a runit-based replacement for the disabled leader-systemd.c when
+building with -Dsystemd=false. Upstream's leader-systemd.c asks a running
+systemd --user instance to activate gnome-session@<name>.target and leans
+entirely on that unit's dependency graph (BindsTo/Requires/Wants across
+gnome-session-*.target, org.gnome.Shell@user.service, gsd-*.service, etc)
+to actually launch gnome-shell, gnome-settings-daemon's components, and
+other session services -- gnome-session-service (gsm-manager.c) itself
+only still spawns "Application"-phase XDG autostart entries directly, not
+the compositor or daemons.
+
+There is no systemd --user equivalent to delegate to here, so
+leader-runit.c supervises the session's essential processes itself via a
+small runit tree. The service definitions are shipped under
+LIBEXECDIR/gnome-session/runit-services, but runsv needs a writable
+supervise/ directory next to each run script, so each session builds a
+private tree under $XDG_RUNTIME_DIR/gnome-session/runit (one directory
+per service, with run symlinked to the shipped script) and runs
+runsvdir -P on that. On SIGTERM/SIGINT it asks runsv to bring each
+service down (`sv -w5 down`) before stopping the supervisor, and only
+quits once runsvdir has actually exited.
+
+The gnome-session-leader-fifo write on shutdown is kept for protocol
+compatibility (matches leader-systemd.c/leader-openrc.c) even though
+nothing in this package currently reads the far end -- best-effort, not
+required for the leader to function.
+
+--- a/gnome-session/meson.build
++++ b/gnome-session/meson.build
+@@ -19,14 +19,18 @@
+   install_dir: session_bindir
+ )
+ 
+-# If you are not using systemd, you must supply your own init-worker
++# If you are not using systemd, we supply our own init-worker that
++# supervises the session under runit instead of systemd --user.
+ if get_option('systemd')
+   sources = files(
+       'gsm-util.c',
+       'leader-systemd.c',
+   )
+ else
+-  sources = disabler()
++  sources = files(
++      'gsm-util.c',
++      'leader-runit.c',
++  )
+ endif
+ 
+ executable(
+--- /dev/null
++++ b/gnome-session/leader-runit.c
+@@ -0,0 +1,259 @@
++/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
++ *
++ * Copyright (C) 2006 Novell, Inc.
++ * Copyright (C) 2008 Red Hat, Inc.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * This is the runit equivalent of leader-systemd.c: it is exec'd by
++ * leader-main.c (as gnome-session-init-worker) once the session's D-Bus
++ * activation environment has been exported. Where the systemd leader asks
++ * systemd --user to activate gnome-session@<name>.target and lets unit
++ * dependencies pull in gnome-shell/gsd/etc, there is no per-user init
++ * manager here to delegate to, so this leader supervises those processes
++ * itself via a small runit tree (runsvdir -P). The service definitions
++ * are shipped under LIBEXECDIR/gnome-session/runit-services, but runsv
++ * needs a writable supervise/ directory next to each run script, so every
++ * session supervises a private copy under $XDG_RUNTIME_DIR whose run
++ * scripts are symlinks back to the shipped ones.
++ *
++ * The gnome-session-leader-fifo protocol is kept for compatibility with
++ * anything that still expects it (e.g. a future gnome-session-monitor
++ * equivalent, or GDM's own session-end detection), but nothing in this
++ * package currently reads the far end -- the write is best-effort.
++ */
++
++#include <config.h>
++
++#include <dirent.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <signal.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <sys/wait.h>
++#include <unistd.h>
++
++#include <glib.h>
++#include <glib-unix.h>
++#include <gio/gio.h>
++
++#include "gsm-util.h"
++
++#define RUNIT_TEMPLATE_DIR (LIBEXECDIR "/gnome-session/runit-services")
++#define SV_DOWN_TIMEOUT_SECS "5"
++
++typedef struct {
++        GMainLoop *loop;
++        GPid       runsvdir_pid;
++        char      *service_dir;
++        int        fifo_fd;
++        gboolean   tearing_down;
++} Leader;
++
++static void
++leader_clear (Leader *ctx)
++{
++        g_clear_pointer (&ctx->loop, g_main_loop_unref);
++        g_clear_pointer (&ctx->service_dir, g_free);
++        if (ctx->fifo_fd >= 0)
++                g_close (ctx->fifo_fd, NULL);
++}
++
++G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (Leader, leader_clear);
++
++static void
++child_setsid (gpointer user_data)
++{
++        /* Give runsvdir its own process group so we can signal the whole
++         * supervision tree (runsvdir + runsv children) as a unit if a
++         * plain per-service teardown doesn't finish in time. */
++        setsid ();
++}
++
++/* Ask runsv to take each service down (waiting up to SV_DOWN_TIMEOUT_SECS
++ * per service) before tearing down the supervisor itself. Best-effort: a
++ * service directory that isn't running yet or has no runsv controlling it
++ * is simply skipped by `sv`. */
++static void
++stop_all_services (Leader *ctx)
++{
++        g_autoptr (GDir) dir = NULL;
++        const char *name;
++
++        dir = g_dir_open (ctx->service_dir, 0, NULL);
++        if (dir == NULL)
++                return;
++
++        while ((name = g_dir_read_name (dir))) {
++                g_autofree char *service_path = NULL;
++                g_autoptr (GError) error = NULL;
++                gchar *argv[] = { "sv", "-w", SV_DOWN_TIMEOUT_SECS, "down", NULL, NULL };
++
++                service_path = g_build_filename (ctx->service_dir, name, NULL);
++                argv[4] = service_path;
++
++                if (!g_spawn_sync (NULL, argv, NULL, G_SPAWN_SEARCH_PATH,
++                                   NULL, NULL, NULL, NULL, NULL, &error))
++                        g_debug ("Couldn't run `sv down` for %s: %s", name, error->message);
++        }
++}
++
++static void
++teardown_session (Leader *ctx)
++{
++        if (ctx->tearing_down || ctx->runsvdir_pid <= 0)
++                return;
++        ctx->tearing_down = TRUE;
++
++        g_debug ("Tearing down session services");
++        stop_all_services (ctx);
++
++        kill (ctx->runsvdir_pid, SIGTERM);
++}
++
++static gboolean
++leader_term_or_int_signal_cb (gpointer data)
++{
++        Leader *ctx = data;
++
++        g_debug ("Session termination requested");
++        teardown_session (ctx);
++
++        if (ctx->fifo_fd >= 0 && write (ctx->fifo_fd, "S", 1) < 0)
++                g_debug ("No monitor listening on leader FIFO: %m");
++
++        return G_SOURCE_REMOVE;
++}
++
++static void
++runsvdir_watch_cb (GPid pid, gint status, gpointer data)
++{
++        Leader *ctx = data;
++
++        g_debug ("runsvdir (pid %d) exited, ending session", (int) pid);
++        g_spawn_close_pid (pid);
++        ctx->runsvdir_pid = 0;
++        g_main_loop_quit (ctx->loop);
++}
++
++/* Build this session's private runit tree: one directory per shipped
++ * service, each holding a symlink to the shipped run script, so runsv can
++ * create its supervise/ state in a location the user can write to. Any
++ * tree left behind by a previous session is removed first. */
++static char *
++setup_service_dir (void)
++{
++        g_autoptr (GDir) dir = NULL;
++        g_autoptr (GError) error = NULL;
++        g_autofree char *parent = NULL;
++        char *service_dir;
++        const char *name;
++        gchar *rm_argv[] = { "rm", "-rf", NULL, NULL };
++
++        parent = g_build_filename (g_get_user_runtime_dir (), "gnome-session", NULL);
++        service_dir = g_build_filename (parent, "runit", NULL);
++
++        rm_argv[2] = service_dir;
++        if (!g_spawn_sync (NULL, rm_argv, NULL, G_SPAWN_SEARCH_PATH,
++                           NULL, NULL, NULL, NULL, NULL, &error))
++                g_error ("Failed to clear stale runit tree %s: %s", service_dir, error->message);
++
++        if (g_mkdir_with_parents (service_dir, 0700) < 0)
++                g_error ("Failed to create runit tree %s: %m", service_dir);
++
++        dir = g_dir_open (RUNIT_TEMPLATE_DIR, 0, &error);
++        if (dir == NULL)
++                g_error ("Runit service directory %s is missing: %s", RUNIT_TEMPLATE_DIR, error->message);
++
++        while ((name = g_dir_read_name (dir))) {
++                g_autofree char *svc = g_build_filename (service_dir, name, NULL);
++                g_autofree char *target = g_build_filename (RUNIT_TEMPLATE_DIR, name, "run", NULL);
++                g_autofree char *link = g_build_filename (svc, "run", NULL);
++
++                if (!g_file_test (target, G_FILE_TEST_IS_EXECUTABLE))
++                        continue;
++                if (g_mkdir (svc, 0700) < 0 || symlink (target, link) < 0)
++                        g_error ("Failed to set up runit service %s: %m", name);
++        }
++
++        return service_dir;
++}
++
++int
++main (int argc, char **argv)
++{
++        g_autoptr (GError) error = NULL;
++        g_auto (Leader) ctx = { .fifo_fd = -1 };
++        g_autofree char *session_name = NULL;
++        const char *debug_string = NULL;
++        g_autofree char *fifo_path = NULL;
++        struct stat statbuf;
++        gchar *runsvdir_argv[] = { "runsvdir", "-P", NULL, NULL };
++
++        if (argc < 2)
++                g_error ("No session name was specified");
++        session_name = g_strdup (argv[1]);
++
++        debug_string = g_getenv ("GNOME_SESSION_DEBUG");
++        if (debug_string != NULL)
++                g_log_set_debug_enabled (atoi (debug_string) == 1);
++
++        gsm_util_export_activation_environment (&error);
++        if (error)
++                g_warning ("Failed to upload environment to DBus: %s", error->message);
++        g_clear_error (&error);
++
++        /* Session's own run scripts read this to know which components
++         * to launch (e.g. which gnome-session-service --session=). */
++        g_setenv ("GNOME_SESSION_NAME", session_name, TRUE);
++
++        ctx.loop = g_main_loop_new (NULL, TRUE);
++
++        fifo_path = g_build_filename (g_get_user_runtime_dir (),
++                                      "gnome-session-leader-fifo",
++                                      NULL);
++        if (mkfifo (fifo_path, 0666) < 0 && errno != EEXIST)
++                g_warning ("Failed to create leader FIFO: %m");
++
++        ctx.fifo_fd = g_open (fifo_path, O_WRONLY | O_NONBLOCK | O_CLOEXEC, 0666);
++        if (ctx.fifo_fd < 0)
++                g_debug ("No leader FIFO reader yet, continuing without one: %m");
++        else if (fstat (ctx.fifo_fd, &statbuf) == 0 && !(statbuf.st_mode & S_IFIFO))
++                g_warning ("Leader FIFO path is not a FIFO, ignoring it");
++
++        ctx.service_dir = setup_service_dir ();
++        runsvdir_argv[2] = ctx.service_dir;
++
++        if (!g_spawn_async (NULL, runsvdir_argv, NULL,
++                            G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_SEARCH_PATH,
++                            child_setsid, NULL, &ctx.runsvdir_pid, &error))
++                g_error ("Failed to start runit session supervisor: %s", error->message);
++
++        g_message ("Starting GNOME session (session: %s) under runit at %s",
++                   session_name, ctx.service_dir);
++
++        g_child_watch_add (ctx.runsvdir_pid, runsvdir_watch_cb, &ctx);
++
++        g_unix_signal_add (SIGHUP, leader_term_or_int_signal_cb, &ctx);
++        g_unix_signal_add (SIGTERM, leader_term_or_int_signal_cb, &ctx);
++        g_unix_signal_add (SIGINT, leader_term_or_int_signal_cb, &ctx);
++
++        g_main_loop_run (ctx.loop);
++        return 0;
++}

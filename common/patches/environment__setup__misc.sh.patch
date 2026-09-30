@@ -1,0 +1,13 @@
+diff --git a/common/environment/setup/misc.sh b/common/environment/setup/misc.sh
+index a7760c8692f..ab3882bb426 100644
+--- a/common/environment/setup/misc.sh
++++ b/common/environment/setup/misc.sh
+@@ -5,7 +5,7 @@
+ set -a
+ 
+ SOURCEFORGE_SITE="https://downloads.sourceforge.net/sourceforge"
+-NONGNU_SITE="https://download.savannah.nongnu.org/releases"
++NONGNU_SITE="https://download-mirror.savannah.nongnu.org/releases"
+ UBUNTU_SITE="http://archive.ubuntu.com/ubuntu/pool"
+ XORG_SITE="https://www.x.org/releases/individual"
+ DEBIAN_SITE="https://ftp.debian.org/debian/pool"

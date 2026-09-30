@@ -1,0 +1,23 @@
+# Template file for 'pix'
+pkgname=pix
+version=3.4.11
+revision=1
+build_style=meson
+configure_args="-Drun-in-place=false -Dwebservices=false -Dlibbrasero=false"
+hostmakedepends="gettext pkg-config itstool glib-devel desktop-file-utils
+ gtk-update-icon-cache python3"
+makedepends="exiv2-devel gtk+3-devel libraw-devel librsvg-devel libwebp-devel
+ libjxl-devel libheif-devel lcms2-devel colord-devel tiff-devel
+ gsettings-desktop-schemas-devel json-glib-devel xapp-devel gstreamer1-devel"
+short_desc="Image organizer and viewer, Linux Mint's fork of gThumb"
+maintainer="Void Linux <null@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="https://github.com/linuxmint/pix"
+changelog="https://raw.githubusercontent.com/linuxmint/pix/master/NEWS"
+distfiles="https://github.com/linuxmint/pix/archive/refs/tags/${version}.tar.gz"
+checksum=47ac74d19399fdde5d0e2e5d1c2b4a29c3281a549ca7881a1fb8457b1bf5c5eb
+
+# Web-service export/import extensions need libsoup-2.4, which Void no
+# longer ships (superseded by libsoup3, an incompatible API); disc-burning
+# support (libbrasero) is a heavy, niche dependency chain for an image
+# viewer. Both are disabled above rather than partially wired up.

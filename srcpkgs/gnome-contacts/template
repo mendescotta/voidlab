@@ -1,0 +1,21 @@
+# Template file for 'gnome-contacts'
+pkgname=gnome-contacts
+version=51.0
+revision=1
+build_style=meson
+hostmakedepends="blueprint-compiler desktop-file-utils docbook-xsl gettext glib-devel gtk4-update-icon-cache gobject-introspection libxslt pkg-config vala"
+makedepends="evolution-data-server-devel folks-devel glycin-devel glycin-gtk4-devel
+ gtk4-devel gnome-online-accounts-devel gstreamer1-devel libadwaita-devel libgee-devel libportal-gtk4-devel
+ qrencode-devel"
+short_desc="GNOME contacts manager"
+maintainer="Enno Boland <gottox@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="https://apps.gnome.org//Contacts/"
+distfiles="${GNOME_SITE}/gnome-contacts/${version%%.*}/gnome-contacts-${version}.tar.xz"
+checksum=c8b60752f65a966e0a2c0cbf7c1e1607ee3b4a49318b50b19bdad2ab7fc6706d
+
+pre_build() {
+	if [ "$CROSS_BUILD" ]; then
+		 export GI_TYPELIB_PATH="${XBPS_CROSS_BASE}/usr/lib/girepository-1.0"
+	fi
+}

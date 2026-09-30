@@ -1,0 +1,109 @@
+# Template file for 'gdm'
+pkgname=gdm
+version=50.3
+revision=1
+build_helper="gir"
+build_style=meson
+configure_args="
+ -Ddefault-pam-config=arch -Dat-spi-registryd-dir=/usr/libexec
+ -Dplymouth=enabled -Dpid-file=/run/gdm/gdm.pid
+ -Dsystemd-journal=false -Dinitial-vt=7 -Dx11-support=true
+ -Dselinux=disabled -Dlibaudit=disabled -Dgdm-xsession=true
+ -Ddefault-path=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin
+ -Dsystemdsystemunitdir=/usr/lib/systemd/system
+ -Dsystemduserunitdir=/usr/lib/systemd/user
+ -Dlogind-provider=elogind"
+hostmakedepends="dconf gettext itstool pkg-config"
+makedepends="accountsservice-devel elogind-devel gettext-devel glib-devel
+ iso-codes libSM-devel libcanberra-devel nss-devel pam-devel upower-devel
+ plymouth-devel libgudev-devel polkit-devel"
+depends="gnome-settings-daemon gnome-shell gnome-session gnome-themes-extra
+ gsettings-desktop-schemas xorg-server xorg-server-xwayland xrdb"
+checkdepends="check-devel"
+short_desc="GNOME Display Manager"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="https://wiki.gnome.org/Projects/GDM"
+# FIXME: dead link
+#changelog="https://gitlab.gnome.org/GNOME/gdm/-/raw/gnome-48/NEWS"
+changelog="https://gitlab.gnome.org/GNOME/gdm/-/raw/main/NEWS"
+distfiles="${GNOME_SITE}/gdm/${version%%.*}/gdm-${version}.tar.xz"
+checksum=adac0710b8b797108ea40ea4573bd1a5e6d9b24e0a7990a994216e8dffe2d15e
+
+conf_files="
+	/etc/gdm/custom.conf
+	/etc/dconf/profile/gdm
+	/etc/pam.d/gdm-autologin
+	/etc/pam.d/gdm-fingerprint
+	/etc/pam.d/gdm-launch-environment
+	/etc/pam.d/gdm-password
+	/etc/pam.d/gdm-smartcard"
+make_dirs="
+	/usr/share/gdm/env.d 0755 root root
+	/etc/gdm/env.d 0755 root root"
+# Create the 'gdm' system user/group.
+# 'gdmgreeter' is the preallocated fallback account GDM's dynamic user
+# store uses for the greeter session on systems without systemd-userdbd
+# (e.g. elogind); without it gdm segfaults in libpcre2 (missing dconf
+# profile below) and then fails with "not preallocated and system lacks
+# userdb", crash-looping.
+# NOTE: xbps-src's system_accounts custom-var mechanism (${_uname}_homedir
+# etc.) generates `export ${_uname}_homedir=...` and evals it as a bash
+# identifier, so the account name here can't contain a dash -- "gdm-greeter"
+# made the generated INSTALL script fail at runtime with "bad variable name".
+system_accounts="gdm gdmgreeter"
+gdm_homedir="/var/lib/gdm"
+gdmgreeter_homedir="/var/lib/gdm/greeter"
+gdmgreeter_descr="gdm greeter unprivileged user"
+
+# Package build options
+build_options="gir"
+build_options_default="gir"
+
+if [ "$CROSS_BUILD" ]; then
+	hostmakedepends+=" glib-devel pam-devel"
+fi
+
+post_install() {
+	for f in $DESTDIR/etc/pam.d/*; do
+		if grep -q "pam_systemd.so" "$f"; then
+			vsed -i "s/pam_systemd\.so/pam_elogind.so/" "$f"
+		fi
+	done
+
+	# Without this profile, the greeter's dconf lookups against the
+	# missing 'gdm' system-db segfault in libpcre2 instead of falling
+	# back cleanly.
+	vmkdir etc/dconf/profile
+	cat > "${DESTDIR}/etc/dconf/profile/gdm" <<-EOF
+		user-db:user
+		system-db:gdm
+		file-db:/usr/share/gdm/greeter-dconf-defaults
+	EOF
+
+	# runit service
+	vsv gdm
+}
+
+libgdm_package() {
+	short_desc+=" - runtime libraries"
+	pkg_install() {
+		vmove "usr/lib/*.so.*"
+		if [ "$build_option_gir" ]; then
+			vmove usr/lib/girepository-1.0
+		fi
+	}
+}
+
+gdm-devel_package() {
+	depends="libgdm>=${version}_${revision} elogind-devel"
+	short_desc+=" - development files"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		if [ "$build_option_gir" ]; then
+			vmove usr/share/gir-1.0
+		fi
+		vmove "usr/lib/*.so"
+	}
+}

@@ -1,0 +1,55 @@
+# Template file for 'gnome-session'
+pkgname=gnome-session
+version=51.0
+revision=3
+build_style=meson
+configure_args="-Dsystemd=false -Dsystemduserunitdir=/usr/lib/systemd/user"
+hostmakedepends="glib-devel gettext pkg-config xmlto"
+makedepends="elogind-devel gnome-desktop-devel gtk+3-devel json-glib-devel
+ libglib-devel libICE-devel libSM-devel xtrans"
+depends="dbus dconf desktop-file-utils bash glib gsettings-desktop-schemas
+ hicolor-icon-theme polkit runit gnome-settings-daemon"
+short_desc="GNOME session management utilities"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-2.0-or-later, LGPL-2.1-or-later"
+homepage="https://gitlab.gnome.org/GNOME/gnome-session"
+changelog="https://gitlab.gnome.org/GNOME/gnome-session/-/raw/main/NEWS"
+distfiles="${GNOME_SITE}/gnome-session/${version%%.*}/gnome-session-${version}.tar.xz"
+checksum=5195c4f60542a953ab6ebd288f3785b8e7746292d8c167e0c99d353438a184d1
+
+post_install() {
+	vinstall ${FILESDIR}/dbus-run-session-if-needed 755 usr/libexec/gnome-session
+	vsed -i "${DESTDIR}/usr/share/wayland-sessions/gnome.desktop" \
+		-e 's|^Exec=|Exec=/usr/libexec/gnome-session/dbus-run-session-if-needed |'
+
+	# leader-runit.c (built when -Dsystemd=false) supervises the session
+	# via runsvdir pointed at this directory; see 02-runit-leader.patch.
+	local svc gsd_plugin
+	local gsd_plugins="a11y-settings color datetime housekeeping keyboard
+	 media-keys power print-notifications rfkill screensaver-proxy
+	 sharing smartcard sound usb-protection wwan"
+
+	vmkdir usr/libexec/gnome-session/runit-services
+	# gsd-xsettings is an X11 client and has its own run script that waits
+	# for gnome-shell's Xwayland display; see files/runit-services/gsd-xsettings.
+	for svc in gnome-session-service gnome-shell gnome-session-initialized \
+	 gsd-xsettings; do
+		vmkdir usr/libexec/gnome-session/runit-services/${svc}
+		vinstall ${FILESDIR}/runit-services/${svc}/run 755 \
+			usr/libexec/gnome-session/runit-services/${svc}
+	done
+
+	# gnome-settings-daemon components: gsm-manager.c (gnome-session-service)
+	# no longer spawns these on its own -- see 02-runit-leader.patch's commit
+	# message -- so they need the same direct supervision as gnome-shell.
+	# gsd-printer, gsd-backlight-helper and gsd-wacom-oled-helper are
+	# on-demand helpers invoked by other gsd plugins, not standalone
+	# autostart daemons, and are intentionally not listed here.
+	for gsd_plugin in ${gsd_plugins}; do
+		vmkdir usr/libexec/gnome-session/runit-services/gsd-${gsd_plugin}
+		vinstall ${FILESDIR}/runit-services/gsd-plugin/run 755 \
+			usr/libexec/gnome-session/runit-services/gsd-${gsd_plugin} run
+		vsed -i "${DESTDIR}/usr/libexec/gnome-session/runit-services/gsd-${gsd_plugin}/run" \
+			-e "s/@PLUGIN@/${gsd_plugin}/"
+	done
+}

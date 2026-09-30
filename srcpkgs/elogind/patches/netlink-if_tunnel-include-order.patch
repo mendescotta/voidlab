@@ -1,0 +1,13 @@
+linux/if_tunnel.h uses struct iphdr without including linux/ip.h
+itself (kernel-libc-headers 6.14), so include it first.
+
+--- a/src/libelogind/sd-netlink/netlink-types-rtnl.c
++++ b/src/libelogind/sd-netlink/netlink-types-rtnl.c
+@@ -19,6 +19,7 @@
+ #include <linux/if_bridge.h>
+ #include <linux/if_link.h>
+ #include <linux/if_macsec.h>
++#include <linux/ip.h>
+ #include <linux/if_tunnel.h>
+ #include <linux/ip.h>
+ #include <linux/l2tp.h>

@@ -1,0 +1,74 @@
+# Template file for 'pam'
+pkgname=pam
+version=1.7.3
+revision=1
+build_style=meson
+# vendordir= keeps every config under /etc/security (conf_files below);
+# elogind/logind stay disabled to avoid a pam <-> elogind build cycle
+configure_args="-Ddocs=disabled -Dexamples=false -Dxtests=false
+ -Dvendordir= -Deconf=disabled -Dlogind=disabled -Delogind=disabled
+ -Daudit=disabled -Dselinux=disabled -Dnis=disabled -Dpwaccess=disabled
+ -Dpam_lastlog=enabled -Dpam_userdb=enabled -Ddb=db"
+hostmakedepends="gettext pkg-config"
+makedepends="libfl-devel db-devel"
+# version of pam-base that doesn't include removed modules
+depends="pam-base>=0.4_1"
+checkdepends="pam-base"
+short_desc="Flexible mechanism for authenticating users"
+maintainer="Érico Nogueira <ericonr@disroot.org>"
+license="BSD-3-Clause"
+homepage="https://github.com/linux-pam/linux-pam"
+changelog="https://raw.githubusercontent.com/linux-pam/linux-pam/master/NEWS"
+distfiles="${homepage}/releases/download/v${version}/Linux-PAM-${version}.tar.xz"
+checksum=2ce4765fd49df6693771ef2941f81e33d8ee14b94a81a5c7b369aa3b137b85a5
+lib32disabled=yes
+
+if [ "$XBPS_TARGET_LIBC" = "glibc" ]; then
+	makedepends+=" libxcrypt-devel"
+fi
+
+conf_files="
+ /etc/environment
+ /etc/security/access.conf
+ /etc/security/group.conf
+ /etc/security/limits.conf
+ /etc/security/namespace.conf
+ /etc/security/pam_env.conf
+ /etc/security/time.conf
+ /etc/security/faillock.conf
+ /etc/security/namespace.init
+ /etc/security/pwhistory.conf"
+make_dirs="
+ /etc/security/limits.d 0755 root root
+ /etc/security/namespace.d 0755 root root"
+
+post_install() {
+	# Fix unix_chkpwd perms.
+	chmod 4755 ${DESTDIR}/usr/bin/unix_chkpwd
+	rm -rf ${DESTDIR}/usr/lib/systemd
+	vlicense COPYING LICENSE
+}
+
+pam-devel_package() {
+	replaces="pam-libs<1.1.8_8"
+	depends="pam-libs>=${version}_${revision}"
+	short_desc+=" - development files"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/*.so
+		vmove usr/lib/pkgconfig
+	}
+}
+pam-libs_package() {
+	short_desc+=" - runtime libraries"
+	pkg_install() {
+		vmove "usr/lib/*.so.*"
+	}
+}
+pam-userdb_package() {
+	lib32disabled=yes
+	short_desc="PAM module to authenticate against a db database"
+	pkg_install() {
+		vmove usr/lib/security/pam_userdb.so
+	}
+}

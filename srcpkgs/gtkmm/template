@@ -1,0 +1,35 @@
+# Template file for 'gtkmm'
+pkgname=gtkmm
+version=3.24.11
+revision=1
+build_style=meson
+configure_args="-Dbuild-demos=false"
+hostmakedepends="pkg-config mm-common gdk-pixbuf"
+makedepends="gtk+3-devel glibmm-devel atkmm-devel pangomm-devel"
+checkdepends="xvfb-run"
+short_desc="C++ bindings for The GTK+ toolkit (v3)"
+maintainer="Enno Boland <gottox@voidlinux.org>"
+license="LGPL-2.1-or-later"
+homepage="https://gtkmm.org"
+# changelog="https://gitlab.gnome.org/GNOME/gtkmm/-/raw/master/NEWS"
+changelog="https://gitlab.gnome.org/GNOME/gtkmm/-/raw/gtkmm-3-24/NEWS"
+distfiles="${GNOME_SITE}/gtkmm/${version%.*}/gtkmm-${version}.tar.xz"
+checksum=19e383c82d5dd89db275e00b82864e90414d4c3fb3d100b2f996bcc2338a4cc7
+make_check_pre="xvfb-run"
+
+if [ "$XBPS_CHECK_PKGS" ]; then
+	configure_args+=" -Dbuild-tests=true"
+else
+	configure_args+=" -Dbuild-tests=false"
+fi
+
+gtkmm-devel_package() {
+	depends="${makedepends} ${sourcepkg}>=${version}_${revision}"
+	short_desc+=" - development files"
+	pkg_install() {
+		vmove usr/include
+		vmove "usr/lib/g[dt]k*"
+		vmove usr/lib/pkgconfig
+		vmove "usr/lib/*.so"
+	}
+}

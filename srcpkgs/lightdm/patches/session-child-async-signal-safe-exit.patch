@@ -1,0 +1,19 @@
+session-child: use _exit() in the signal handler
+
+exit() is not async-signal-safe: if SIGTERM arrives while the main
+thread holds the malloc lock, the atexit/destructor path deadlocks in
+free() and session-child hangs until it is SIGKILLed, delaying logins.
+
+https://github.com/canonical/lightdm/issues/484
+
+--- a/src/session-child.c
++++ b/src/session-child.c
+@@ -168,7 +168,7 @@ signal_cb (int signum)
+     if (child_pid > 0)
+         kill (child_pid, signum);
+     else
+-        exit (EXIT_SUCCESS);
++        _exit (EXIT_SUCCESS);
+ }
+ 
+ static XAuthority *

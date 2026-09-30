@@ -1,0 +1,14 @@
+# Template file for 'xdg-user-dirs-gtk'
+pkgname=xdg-user-dirs-gtk
+version=0.16
+revision=1
+build_style=meson
+hostmakedepends="pkg-config xdg-user-dirs gettext"
+makedepends="gtk+3-devel"
+depends="xdg-user-dirs"
+short_desc="GTK+ tool to help manage user directories"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="http://www.gnome.org"
+distfiles="${GNOME_SITE}/xdg-user-dirs-gtk/${version}/xdg-user-dirs-gtk-${version}.tar.xz"
+checksum=be825de7f89175db5ead0cd3744d2761109c70943251a87092259163025520a9

@@ -1,0 +1,16 @@
+# Template file for 'gnome-user-docs'
+pkgname=gnome-user-docs
+version=51.0
+revision=1
+build_style=meson
+configure_args="-Dtests=false"
+hostmakedepends="gettext pkg-config itstool"
+makedepends="yelp"
+depends="yelp"
+short_desc="User documentation for GNOME"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="CC-BY-3.0"
+homepage="https://gitlab.gnome.org/GNOME/gnome-user-docs"
+changelog="https://gitlab.gnome.org/GNOME/gnome-user-docs/-/raw/master/NEWS"
+distfiles="${GNOME_SITE}/gnome-user-docs/${version%.*}/gnome-user-docs-${version}.tar.xz"
+checksum=bf3ebd7fa1da70617884b07392de8d605305cfef71c2e883749cb08ff0d6a7d1

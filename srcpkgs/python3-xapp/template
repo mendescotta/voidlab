@@ -1,0 +1,13 @@
+# Template file for 'python3-xapp'
+pkgname=python3-xapp
+version=3.0.3
+revision=1
+build_style=meson
+hostmakedepends="python3 python3-packaging-bootstrap"
+depends="python3 python3-psutil xapp"
+short_desc="Python3 Xapp Library"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="LGPL-2.1-or-later"
+homepage="https://github.com/linuxmint/python3-xapp"
+distfiles="https://github.com/linuxmint/python3-xapp/archive/${version}.tar.gz"
+checksum=30cf81249a7c5cabc25e465e369928724e091e95c5095704518f14ca6fd11f41

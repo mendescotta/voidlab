@@ -1,0 +1,6 @@
+[org.gnome.desktop.interface:COSMIC]
+color-scheme = "prefer-dark"
+font-name = "Open Sans 11"
+document-font-name = "Open Sans 11"
+monospace-font-name = "Noto Sans Mono 11"
+

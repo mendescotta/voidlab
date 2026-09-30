@@ -1,0 +1,6 @@
+#!/bin/sh
+# Template run script; @PLUGIN@ is substituted per-plugin at package
+# install time (see gnome-session's post_install). Started by
+# leader-runit.c under runsvdir -P, same as the other session services.
+exec 2>&1
+exec /usr/libexec/gsd-@PLUGIN@

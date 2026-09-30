@@ -1,0 +1,89 @@
+Upstream's set_corner_radius/unset_corner_radius handlers are no-op
+stubs, so a surface's rounded-corner state changes without ever
+triggering a redraw -- the old corners linger on screen until something
+else forces a repaint. Force a redraw on both set and unset so corner
+radius changes actually render immediately. Confirmed still needed
+against 1.5.0 upstream (unrelated to the LayerHookId fix that did land
+upstream in ffeda337).
+
+Upstream tried the same fix and reverted it in cosmic-comp#2543,
+concluding the redraw "always fails anyway" -- but per their own
+investigation in that PR's discussion, it only fails because
+visible_output_for_surface() returns None when corner radius is set
+before a window's first buffer commit (i.e. on initial window mapping,
+the overwhelmingly common case). The redraw genuinely succeeds for the
+case this patch actually targets: a live corner-radius change on an
+already-mapped window (e.g. changing the theme's rounding at runtime).
+Upstream's own maintainer suggested dropping the log message as a
+valid alternative to reverting the whole mechanism -- do that instead,
+since the warning would otherwise fire on nearly every window creation
+(worse than the once-per-boot journald warnings patched out elsewhere
+in this tree).
+
+--- a/src/wayland/handlers/corner_radius.rs
++++ b/src/wayland/handlers/corner_radius.rs
+@@ -3,7 +3,7 @@
+
+ use crate::wayland::protocols::corner_radius::{
+     CacheableCorners, CacheablePadding, CornerRadiusData, CornerRadiusHandler, CornerRadiusState,
+-    delegate_corner_radius,
++    CornerRadiusSurface, delegate_corner_radius,
+ };
+
+ use crate::state::State;
+@@ -13,13 +13,51 @@
+         &mut self.common.corner_radius_state
+     }
+
+-    fn set_corner_radius(&mut self, _data: &CornerRadiusData) {}
++    fn set_corner_radius(&mut self, data: &CornerRadiusData) {
++        force_redraw(self, data);
++    }
++
++    fn unset_corner_radius(&mut self, data: &CornerRadiusData) {
++        force_redraw(self, data);
++    }
+
+-    fn unset_corner_radius(&mut self, _data: &CornerRadiusData) {}
++    fn set_padding(&mut self, data: &CornerRadiusData) {
++        force_redraw(self, data);
++    }
++
++    fn unset_padding(&mut self, data: &CornerRadiusData) {
++        force_redraw(self, data);
++    }
++}
+
+-    fn set_padding(&mut self, _data: &CornerRadiusData) {}
++fn force_redraw(state: &mut State, data: &CornerRadiusData) -> Option<()> {
++    let guard = data.lock().unwrap();
++    let shell = state.common.shell.read();
++
++    let output = match &guard.surface {
++        CornerRadiusSurface::Toplevel(toplevel) => {
++            let toplevel = toplevel.upgrade().ok()?;
++            let surface = state.common.xdg_shell_state.get_toplevel(&toplevel)?;
++            shell.visible_output_for_surface(surface.wl_surface())?
++        }
++        CornerRadiusSurface::Popup(popup) => {
++            let popup = popup.upgrade().ok()?;
++            let surface = state.common.xdg_shell_state.get_popup(&popup)?;
++            shell.visible_output_for_surface(surface.wl_surface())?
++        }
++        CornerRadiusSurface::Layer(layer) => {
++            let layer = layer.upgrade().ok()?;
++            let surface = state
++                .common
++                .layer_shell_state
++                .layer_surfaces()
++                .find(|l| l.shell_surface() == &layer)?;
++            shell.visible_output_for_surface(surface.wl_surface())?
++        }
++    };
+
+-    fn unset_padding(&mut self, _data: &CornerRadiusData) {}
++    state.backend.schedule_render(output);
++    Some(())
+ }
+
+ pub fn surface_corners(states: &SurfaceData, size: Size<i32, Logical>) -> Option<[u8; 4]> {

@@ -1,0 +1,23 @@
+# Template file for 'gnome-initial-setup'
+pkgname=gnome-initial-setup
+version=51.0
+revision=1
+build_style=meson
+configure_args="-Dparental_controls=disabled"
+hostmakedepends="pkg-config glib-devel gettext dconf"
+makedepends="NetworkManager-devel accountsservice-devel libglib-devel
+ gnome-desktop-devel libgweather-devel libwebkitgtk60-devel
+ gnome-online-accounts-devel gdm-devel libpwquality-devel gtk+3-devel
+ mit-krb5-devel vala-devel libnma-devel polkit-devel gtk4-devel
+ rest-devel libsecret-devel ibus-devel iso-codes geoclue2-devel
+ pango-devel libadwaita-devel geocode-glib-devel"
+depends="iso-codes ibus-gtk4"
+short_desc="GNOME initial setup"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="https://wiki.gnome.org/Design/OS/InitialSetup"
+changelog="https://gitlab.gnome.org/GNOME/gnome-initial-setup/-/raw/master/NEWS"
+distfiles="${GNOME_SITE}/gnome-initial-setup/${version%%.*}/gnome-initial-setup-${version}.tar.xz"
+checksum=22a1b61fccf9e4da9f925452984e458d85b34323f4399125cd36854f5eb66cc4
+
+system_groups="gnome-initial-setup"

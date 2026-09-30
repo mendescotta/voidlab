@@ -1,0 +1,20 @@
+#!/bin/sh
+# D-Bus activation entry point for org.freedesktop.login1.
+#
+# When the runit service is enabled, hand startup to runsv instead of
+# spawning a second, unsupervised daemon: elogind exits 0 when it finds
+# /run/elogind.pid, so an activated instance that wins the race at boot
+# leaves the service stuck in a restart loop.
+svdir=/var/service/elogind
+
+if [ -e "$svdir" ]; then
+	# early in boot runsvdir may not have spawned runsv for it yet
+	i=0
+	while [ ! -p "$svdir/supervise/ok" ] && [ "$i" -lt 5 ]; do
+		sleep 1
+		i=$((i + 1))
+	done
+	/usr/bin/sv -w 15 start "$svdir" >/dev/null && exit 0
+fi
+
+exec /usr/libexec/elogind/elogind --daemon

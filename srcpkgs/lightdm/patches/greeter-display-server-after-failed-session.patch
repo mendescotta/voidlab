@@ -1,0 +1,23 @@
+seat: give the new display server to the greeter after a failed session
+
+When a session fails to start and its display server cannot be shared,
+switch_to_greeter_from_failed_session() created the replacement display
+server for (and attached it to) the failed session rather than the
+greeter, leaving e.g. a Wayland autologin with an expired password on a
+black screen.
+
+Based on https://github.com/canonical/lightdm/pull/402
+
+--- a/src/seat.c
++++ b/src/seat.c
+@@ -620,8 +620,8 @@ switch_to_greeter_from_failed_session (Seat *seat, Session *session)
+             session_set_display_server (SESSION (greeter_session), session_get_display_server (session));
+         else
+         {
+-            DisplayServer *display_server = create_display_server (seat, session);
+-            session_set_display_server (session, display_server);
++            DisplayServer *display_server = create_display_server (seat, SESSION (greeter_session));
++            session_set_display_server (SESSION (greeter_session), display_server);
+             if (!start_display_server (seat, display_server))
+             {
+                 l_debug (seat, "Failed to start display server for greeter");

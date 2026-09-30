@@ -1,0 +1,38 @@
+# Template file for 'caerus'
+#
+# To use: copy or symlink this directory to <void-packages checkout>/srcpkgs/caerus,
+# then from inside that checkout: ./xbps-src pkg caerus
+pkgname=caerus
+version=0.5.0
+revision=1
+build_style=cargo
+hostmakedepends="pkg-config clang"
+makedepends="gtk4-devel libxbps-devel glib-devel"
+depends="polkit"
+short_desc="Synaptic-inspired GTK4 package manager for Void Linux, built on libxbps"
+maintainer="gui <mendescotta@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/mendescotta/Caerus"
+distfiles="https://github.com/mendescotta/Caerus/archive/refs/tags/v${version}.tar.gz"
+checksum=6a527f8c2e62763d58991e38191b584ead6eadf93a43bdb0373eaa63f08040a8
+
+do_install() {
+	vbin target/${RUST_TARGET}/release/caerus
+	vinstall target/${RUST_TARGET}/release/caerus-helper 755 usr/libexec
+
+	vinstall caerus/data/org.voidlinux.caerus.policy 644 usr/share/polkit-1/actions
+	vinstall caerus/data/org.voidlinux.caerus.desktop 644 usr/share/applications
+	vinstall caerus/data/org.voidlinux.caerus.metainfo.xml 644 usr/share/metainfo
+	vinstall caerus/data/icons/hicolor/scalable/apps/org.voidlinux.caerus.svg \
+		644 usr/share/icons/hicolor/scalable/apps
+
+	# Bundled fallback copies of the symbolic icons the UI uses (see
+	# ensure_icon_theme_fallback() in caerus/src/ui/window.rs) — installed
+	# under hicolor, which every icon theme falls back to automatically.
+	find caerus/data/icons/hicolor/symbolic -name '*.svg' | while read -r svg; do
+		rel="${svg#caerus/data/icons/hicolor/}"
+		vinstall "${svg}" 644 "usr/share/icons/hicolor/$(dirname "${rel}")"
+	done
+
+	vlicense LICENSE
+}

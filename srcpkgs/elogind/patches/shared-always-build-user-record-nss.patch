@@ -1,0 +1,19 @@
+userdb.c, which is always built, calls into user-record-nss.c, so
+building with -Dnss-elogind=false fails to link libelogind-shared.
+
+https://github.com/elogind/elogind/issues/365
+
+--- a/src/shared/meson.build
++++ b/src/shared/meson.build
+@@ -279,9 +279,8 @@
+         'xml.c',
+ )
+ 
+-if get_option('nss-elogind') != false
+-	shared_sources += files('user-record-nss.c')
+-endif
++# userdb.c always needs user-record-nss.c
++shared_sources += files('user-record-nss.c')
+ 
+ #endif // 0
+ 

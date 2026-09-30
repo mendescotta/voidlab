@@ -1,0 +1,17 @@
+From 389d9e09217ee598674ff7d6df69563be51cbfe6 Mon Sep 17 00:00:00 2001
+From: Piotr Wójcik <chocimier@tlen.pl>
+Date: Sat, 1 Jul 2023 17:30:54 +0200
+Subject: adjust-PATH-for-usrmerge
+
+
+--- a/src/session-child.c	2026-09-29 18:49:11.625977748 +0300
++++ b/src/session-child.c	2026-09-29 18:49:11.667173843 +0300
+@@ -397,7 +397,7 @@
+         else
+         {
+             /* Set POSIX variables */
+-            pam_putenv (pam_handle, "PATH=/usr/local/bin:/usr/bin:/bin");
++            pam_putenv (pam_handle, "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin");
+             g_autofree gchar* user_env = g_strdup_printf ("USER=%s", username);
+             pam_putenv (pam_handle, user_env);
+             g_autofree gchar* logname_env = g_strdup_printf ("LOGNAME=%s", username);

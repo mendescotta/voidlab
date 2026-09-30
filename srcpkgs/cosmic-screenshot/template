@@ -1,0 +1,24 @@
+# Template file for 'cosmic-screenshot'
+pkgname=cosmic-screenshot
+version=1.9.0
+revision=1
+archs="x86_64*"
+build_style=cargo
+configure_args="--workspace"
+hostmakedepends="just $(vopt_if sccache "rust-sccache")"
+depends="cosmic-icons xdg-desktop-portal-cosmic"
+short_desc="COSMIC Screenshot Utility"
+maintainer="Bella109 <belladev109@proton.me>"
+license="GPL-3.0-only"
+homepage="https://github.com/pop-os/cosmic-screenshot"
+distfiles="https://github.com/pop-os/cosmic-screenshot/archive/refs/tags/epoch-${version}.tar.gz"
+checksum=2f809f4e1ed8ca218b9d39975cee290d168f231b48204a4d91d75ee63f30abcb
+build_options="sccache"
+
+pre_build() {
+	$(vopt_if sccache "export RUSTC_WRAPPER=/usr/bin/sccache")
+}
+
+do_install() {
+	just rootdir="${DESTDIR}" cargo-target-dir="target/${RUST_TARGET}" install
+}

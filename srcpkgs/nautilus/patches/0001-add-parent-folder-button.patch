@@ -1,0 +1,17 @@
+diff --git a/src/resources/ui/nautilus-history-controls.blp b/src/resources/ui/nautilus-history-controls.blp
+index f865151..d56187e 100644
+--- a/src/resources/ui/nautilus-history-controls.blp
++++ b/src/resources/ui/nautilus-history-controls.blp
+@@ -22,5 +22,12 @@ template $NautilusHistoryControls: Adw.Bin {
+       action-name: "slot.forward";
+       icon-name: "go-next-symbolic";
+     }
++
++    Button up_button {
++      tooltip-text: _("Open Parent Folder");
++      valign: center;
++      action-name: "slot.up";
++      icon-name: "go-up-symbolic";
++    }
+   };
+ }

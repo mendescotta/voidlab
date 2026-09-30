@@ -1,0 +1,24 @@
+# Template file for 'cosmic-desktop'
+pkgname=cosmic-desktop
+version=1.9.0
+revision=1
+archs="x86_64*"
+metapackage="yes"
+depends="
+ cosmic-applets cosmic-applibrary cosmic-bg cosmic-comp cosmic-edit
+ cosmic-files cosmic-greeter cosmic-icons cosmic-idle cosmic-initial-setup
+ cosmic-launcher cosmic-monitor cosmic-notifications cosmic-osd cosmic-osk cosmic-panel
+ cosmic-player cosmic-randr cosmic-screenshot cosmic-session cosmic-settings
+ cosmic-settings-daemon cosmic-sound-theme cosmic-store cosmic-term
+ cosmic-tweaks cosmic-wallpapers cosmic-viewer cosmic-workspaces-epoch
+ xdg-desktop-portal-cosmic
+ bash dbus xdg-user-dirs elogind
+ wayland xorg-server-xwayland vulkan-loader libglvnd mesa-dri switcheroo-control
+ freetype fontconfig gsettings-desktop-schemas
+ dejavu-fonts-ttf liberation-fonts-ttf noto-fonts-ttf noto-fonts-emoji
+ bluez pipewire wireplumber gstreamer1-pipewire libspa-bluetooth"
+replaces="cosmic>=0 cosmic-desktop-full>=0"
+short_desc="Full COSMIC desktop for Void Linux"
+maintainer="Bella109 <belladev109@proton.me>"
+license="GPL-3.0-only AND MPL-2.0"
+homepage="https://github.com/pop-os/cosmic-epoch"

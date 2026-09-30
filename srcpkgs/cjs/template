@@ -1,0 +1,33 @@
+# Template file for 'cjs'
+pkgname=cjs
+version=140.1
+revision=1
+build_style=meson
+build_helper="gir"
+configure_args="-Dprofiler=disabled -Dinstalled_tests=false"
+hostmakedepends="pkg-config glib-devel dbus xvfb-run gtk4"
+makedepends="readline-devel mozjs${version%%.*}-devel gtk4-devel"
+depends="gtk+3"
+short_desc="Javascript for Cinnamon"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="LGPL-2.0-or-later"
+homepage="https://github.com/linuxmint/cjs"
+distfiles="https://github.com/linuxmint/cjs/archive/refs/tags/${version}.tar.gz"
+checksum=1e223ce6229a7dc926b5ec3ee42040f6848e466ab51eb36c415c283b0b03098c
+make_check_pre="xvfb-run"
+
+pre_configure() {
+	# The deleted lines in meson.build try to build and run a simple program,
+	# and that does not work when cross-compiling.
+	vsed -e '/Check if a minimal SpiderMonkey program compiles/,/^endif/d' -i meson.build
+}
+
+cjs-devel_package() {
+	depends="${makedepends} ${sourcepkg}>=${version}_${revision}"
+	short_desc+=" - development files"
+	pkg_install() {
+		vmove "usr/lib/*.so"
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+	}
+}

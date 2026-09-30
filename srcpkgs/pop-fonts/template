@@ -1,0 +1,15 @@
+# Template file for 'pop-fonts'
+pkgname=pop-fonts
+version=2021.08.25
+revision=1
+_commit=2da23d5e76bf724c49875e8fd328e1fd5a6de80e
+short_desc="Pop Fonts"
+maintainer="Bella Wagner <belladev109@proton.me>"
+license="OFL-1.1"
+homepage="https://github.com/pop-os/fonts"
+distfiles="https://github.com/pop-os/fonts/archive/${_commit}.tar.gz"
+checksum=c53471eeadb274ad15155d232d87e74b62c3f5f84229c672c0345bea77c2368c
+
+do_install() {
+	make install DESTDIR=${DESTDIR}
+}

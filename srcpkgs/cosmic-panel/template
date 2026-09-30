@@ -1,0 +1,46 @@
+# Template file for 'cosmic-panel'
+pkgname=cosmic-panel
+version=1.9.0
+revision=1
+archs="x86_64*"
+build_style=cargo
+configure_args="--workspace"
+hostmakedepends="pkg-config just python3 $(vopt_if sccache "rust-sccache")"
+makedepends="libxkbcommon-devel libgbm-devel"
+depends="libxkbcommon wayland"
+short_desc="XDG Shell Wrapper Panel for COSMIC"
+maintainer="Bella109 <belladev109@proton.me>"
+license="GPL-3.0-only AND MPL-2.0"
+homepage="https://github.com/pop-os/cosmic-panel"
+distfiles="https://github.com/pop-os/cosmic-panel/archive/refs/tags/epoch-${version}.tar.gz"
+checksum=6b036076e162568b6d0230ab82916b30d06b4942cb5be6a39960e42b499cab9b
+build_options="sccache"
+
+pre_build() {
+	$(vopt_if sccache "export RUSTC_WRAPPER=/usr/bin/sccache")
+
+	# libcosmic's vendored iced_winit fork panics instead of exiting
+	# cleanly when the compositor tears down the wayland connection
+	# (e.g. on logout): its SCTK event-loop thread just re-dispatches
+	# forever after a fatal IO error until an unrelated unwrap() further
+	# down eventually panics. That dependency is a cargo git dependency
+	# pinned in cosmic-panel's own Cargo.lock, not part of this package's
+	# source tree, so it can't be fixed with a normal srcpkgs patches/
+	# entry -- fetch it first, then patch the checkout in place before
+	# `cargo build` compiles it. See files/patch-vendored-iced-sctk-panic.py
+	# for the actual fix and why it's written this way.
+	cargo fetch --locked --target "${RUST_TARGET}"
+	local _f
+	_f=$(find "${CARGO_HOME}/git/checkouts" \
+		-path '*/libcosmic-*/*/iced/winit/src/platform_specific/wayland/event_loop/mod.rs' \
+		-print -quit)
+	if [ -z "${_f}" ]; then
+		msg_warn "cosmic-panel: vendored iced_winit event_loop/mod.rs not found after fetch, skipping SCTK-panic workaround\n"
+	else
+		python3 "${FILESDIR}/patch-vendored-iced-sctk-panic.py" "${_f}"
+	fi
+}
+
+do_install() {
+	just rootdir="${DESTDIR}" cargo-target-dir="target/${RUST_TARGET}" install
+}

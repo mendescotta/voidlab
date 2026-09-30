@@ -1,0 +1,53 @@
+From 915d194f103e9ca4688311fcc6eea4f08fee6327 Mon Sep 17 00:00:00 2001
+From: Ben Younes <2910651+ousamabenyounes@users.noreply.github.com>
+Date: Thu, 20 Aug 2026 00:13:03 +0000
+Subject: [PATCH] xdmcp-server: fix double-free on unmanaged session timeout
+
+session_timeout_cb() took ownership of the SessionData via
+g_autoptr(SessionData) and then called g_hash_table_remove(), whose value
+destroy function (session_data_free) frees the same SessionData. The autoptr
+cleanup at scope exit therefore freed it a second time, unref-ing the already
+finalized XDMCPSession and double-freeing the struct. session_data_free() also
+re-removed the timeout source that G_SOURCE_REMOVE was already tearing down,
+producing the "Source ID was not found" warning.
+
+Let the hash table be the sole owner: drop the autoptr, clear timeout_source
+before removal so it is not removed twice, and cache the session id before the
+entry is freed.
+
+Co-authored-by: undroidwish
+---
+ src/xdmcp-server.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/src/xdmcp-server.c b/src/xdmcp-server.c
+index 5ebcacfa4..ad328dc0e 100644
+--- a/src/xdmcp-server.c
++++ b/src/xdmcp-server.c
+@@ -160,16 +160,21 @@ session_data_free (SessionData *data)
+     g_free (data);
+ }
+ 
+-G_DEFINE_AUTOPTR_CLEANUP_FUNC (SessionData, session_data_free)
+-
+ static gboolean
+ session_timeout_cb (gpointer user_data)
+ {
+-    g_autoptr(SessionData) data = user_data;
++    SessionData *data = user_data;
+     XDMCPServerPrivate *priv = xdmcp_server_get_instance_private (data->server);
++    guint16 id = xdmcp_session_get_id (data->session);
++
++    /* This source is being removed by returning G_SOURCE_REMOVE below, so clear
++       the stored source id to stop session_data_free() from removing it again. */
++    data->timeout_source = 0;
+ 
+-    g_debug ("Timing out unmanaged session %d", xdmcp_session_get_id (data->session));
+-    g_hash_table_remove (priv->sessions, GINT_TO_POINTER ((gint) xdmcp_session_get_id (data->session)));
++    g_debug ("Timing out unmanaged session %d", id);
++    /* Removing the entry frees data via the hash table's value destroy
++       function (session_data_free); do not free it again here. */
++    g_hash_table_remove (priv->sessions, GINT_TO_POINTER ((gint) id));
+     return G_SOURCE_REMOVE;
+ }
+ 

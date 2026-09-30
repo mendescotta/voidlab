@@ -1,0 +1,30 @@
+# Template file for 'sushi'
+pkgname=sushi
+version=51.1
+revision=1
+build_helper="gir"
+build_style=meson
+hostmakedepends="glib-devel gettext pkg-config
+ $(vopt_if gir 'gobject-introspection') gjs gstreamer1 blueprint-compiler"
+makedepends="gtk4-devel libadwaita-devel libpapers-devel gtksourceview5-devel
+ libwebkitgtk60-devel glycin-gtk4-devel gstreamer1-devel gst-plugins-base1-devel
+ harfbuzz-devel freetype-devel fribidi-devel libX11-devel"
+depends="libpapers nautilus gjs"
+short_desc="Quick image previewer over DBus for Nautilus"
+maintainer="Enno Boland <gottox@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="https://gitlab.gnome.org/GNOME/sushi"
+#changelog="https://gitlab.gnome.org/GNOME/sushi/-/raw/master/NEWS"
+changelog="https://gitlab.gnome.org/GNOME/sushi/-/raw/gnome-51/NEWS"
+distfiles="${GNOME_SITE}/sushi/${version%.*}/sushi-${version}.tar.xz"
+checksum=d326ec69fc004be3a5fc048f7ecf2c8eb828b7d8b682f1e7a2ba01a5e72993e1
+lib32disabled=yes
+
+build_options="gir"
+build_options_default="gir"
+
+pre_build() {
+	if [ "$CROSS_BUILD" ]; then
+		export GST_PLUGIN_SCANNER="/usr/bin/false"
+	fi
+}

@@ -1,0 +1,80 @@
+From bce05987bfea5cda8060f59159becb7de7353a46 Mon Sep 17 00:00:00 2001
+From: Miroslav Lichvar <mlichvar@redhat.com>
+Date: Thu, 16 Jan 2025 15:34:47 +0100
+Subject: [PATCH] udev: set clock group for PTP and RTC devices
+
+Add a new group for clock devices to enable applications like linuxptp
+to open clocks without root privileges.
+
+[eudev: only the rules are ported; distributions need to create the
+clock group. Without it, an error is logged and the devices stay
+root-owned.]
+
+systemd-commit: af96ccfc24bc4803078a46b4ef2cdeb5decdfbcd
+---
+ rules/50-udev-default.rules | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/rules/50-udev-default.rules b/rules/50-udev-default.rules
+index bd9ace9f0..884376f3f 100644
+--- a/rules/50-udev-default.rules
++++ b/rules/50-udev-default.rules
+@@ -10,6 +10,7 @@ SUBSYSTEM=="block", KERNEL=="md*", ENV{ID_IGNORE_DISKSEQ}="1"
+ 
+ SUBSYSTEM=="virtio-ports", KERNEL=="vport*", ATTR{name}=="?*", SYMLINK+="virtio-ports/$attr{name}"
+ 
++SUBSYSTEM=="rtc", GROUP="clock", MODE="0660"
+ # select "system RTC" or just use the first one
+ SUBSYSTEM=="rtc", ATTR{hctosys}=="1", SYMLINK+="rtc"
+ SUBSYSTEM=="rtc", KERNEL=="rtc0", SYMLINK+="rtc", OPTIONS+="link_priority=-100"
+@@ -21,6 +22,7 @@ ENV{MODALIAS}!="", IMPORT{builtin}="hwdb --subsystem=$env{SUBSYSTEM}"
+ 
+ SUBSYSTEM=="net", IMPORT{builtin}="net_driver"
+ 
++SUBSYSTEM=="ptp", GROUP="clock", MODE="0660"
+ SUBSYSTEM=="ptp", ATTR{clock_name}=="KVM virtual PTP", SYMLINK+="ptp_kvm"
+ SUBSYSTEM=="ptp", ATTR{clock_name}=="hyperv", SYMLINK+="ptp_hyperv"
+ SUBSYSTEM=="ptp", ATTR{clock_name}=="ptp_vmw", SYMLINK+="ptp_vmware"
+From 82956a47e9191f4c1d8a8ceacaeaf1a9d7581847 Mon Sep 17 00:00:00 2001
+From: Carolina Jubran <cjubran@nvidia.com>
+Date: Mon, 16 Feb 2026 11:24:53 +0200
+Subject: [PATCH] udev: grant read access to PTP devices for unprivileged users
+
+Change the default udev rule for /dev/ptp* from 0660 to 0664,
+allowing unprivileged users read-only access.
+
+NIC telemetry and hardware logs often use device timestamps that must
+be correlated with host time via read-only PTP ioctls (e.g.
+cross-timestamp queries). Requiring privileged access makes these
+workflows unnecessarily restrictive.
+
+Older kernels lacked proper permission checks in some PTP ioctls.
+Kernel commit b4e53b15c04e3852949003752f48f7a14ae39e86 ("ptp: Add PHC
+file mode checks. Allow RO adjtime() without FMODE_WRITE.") introduces
+the necessary file mode validation, ensuring that read access does not
+permit clock modification or configuration changes, which still require
+write permissions.
+
+This commit has been backported to all actively maintained stable
+kernel branches.
+
+Related to #31034
+
+systemd-commit: 1e6854e112e9723be6108b83f6935ec7e04cea17
+---
+ rules/50-udev-default.rules | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rules/50-udev-default.rules b/rules/50-udev-default.rules
+index 884376f3f..4d2b7c164 100644
+--- a/rules/50-udev-default.rules
++++ b/rules/50-udev-default.rules
+@@ -22,7 +22,7 @@ ENV{MODALIAS}!="", IMPORT{builtin}="hwdb --subsystem=$env{SUBSYSTEM}"
+ 
+ SUBSYSTEM=="net", IMPORT{builtin}="net_driver"
+ 
+-SUBSYSTEM=="ptp", GROUP="clock", MODE="0660"
++SUBSYSTEM=="ptp", GROUP="clock", MODE="0664"
+ SUBSYSTEM=="ptp", ATTR{clock_name}=="KVM virtual PTP", SYMLINK+="ptp_kvm"
+ SUBSYSTEM=="ptp", ATTR{clock_name}=="hyperv", SYMLINK+="ptp_hyperv"
+ SUBSYSTEM=="ptp", ATTR{clock_name}=="ptp_vmw", SYMLINK+="ptp_vmware"

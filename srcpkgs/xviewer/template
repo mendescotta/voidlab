@@ -1,0 +1,17 @@
+# Template file for 'xviewer'
+pkgname=xviewer
+version=3.4.17
+revision=1
+build_style=meson
+build_helper="gir"
+configure_args="-Ddocs=false"
+hostmakedepends="pkg-config gettext glib-devel itstool"
+makedepends="gtk+3-devel libpeas-devel cinnamon-desktop-devel xapp-devel
+ exempi-devel libexif-devel libjpeg-turbo-devel lcms2-devel librsvg-devel"
+short_desc="Generic image viewer, Linux Mint's fork of eog"
+maintainer="Void Linux <null@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="https://github.com/linuxmint/xviewer"
+changelog="https://raw.githubusercontent.com/linuxmint/xviewer/master/NEWS"
+distfiles="https://github.com/linuxmint/xviewer/archive/refs/tags/${version}.tar.gz"
+checksum=4d8000f783d167903a165c57b4d260bb265eb678085e47ca0f23656d7591e386

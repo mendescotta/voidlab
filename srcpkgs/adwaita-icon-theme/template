@@ -1,0 +1,18 @@
+# Template file for 'adwaita-icon-theme'
+pkgname=adwaita-icon-theme
+version=51.0
+revision=1
+build_style=meson
+hostmakedepends="pkg-config"
+depends="librsvg"
+short_desc="Theme consisting of a set of icons for GTK+"
+maintainer="icp <pangolin@vivaldi.net>"
+license="LGPL-3.0-or-later, CC-BY-SA-3.0"
+homepage="https://gitlab.gnome.org/GNOME/adwaita-icon-theme"
+changelog="https://gitlab.gnome.org/GNOME/adwaita-icon-theme/-/raw/master/NEWS"
+distfiles="${GNOME_SITE}/adwaita-icon-theme/${version/.*/}/adwaita-icon-theme-${version}.tar.xz"
+checksum=ba561cf3c96305a47179fa5605856ad695c9238ea07f7093aebd9ba80c4e323b
+
+pre_configure() {
+	ln -s /bin/true "$XBPS_WRAPPERDIR/gtk-update-icon-cache"
+}

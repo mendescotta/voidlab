@@ -1,0 +1,65 @@
+Void's packaged elogind (252.39) predates sd_session_get_username(), which
+elogind gained upstream only in a much newer release. Rather than bumping
+elogind itself (it underpins the whole login/power stack, not just GNOME),
+resolve the username locally via sd_session_get_uid() + getpwuid(), which
+both the systemd and elogind sd-login.h implementations have always had.
+
+--- a/daemon/gdm-manager.c
++++ b/daemon/gdm-manager.c
+@@ -21,6 +21,7 @@
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <fcntl.h>
++#include <pwd.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <signal.h>
+@@ -1896,7 +1897,17 @@ on_stop_conflicting_session (GdmSession *login_session,
+         int res;
+         int i;
+
+-        res = sd_session_get_username (opened_session_id, &username);
++        {
++                uid_t uid;
++                struct passwd *pw;
++
++                res = sd_session_get_uid (opened_session_id, &uid);
++                if (res >= 0) {
++                        pw = getpwuid (uid);
++                        username = pw ? g_strdup (pw->pw_name) : NULL;
++                        res = pw ? 0 : -ENOENT;
++                }
++        }
+         if (res < 0) {
+                 g_warning ("Failed to get username of opened session: %s", strerror (-res));
+                 return;
+--- a/utils/gdm-new-session.c
++++ b/utils/gdm-new-session.c
+@@ -8,6 +8,7 @@
+ #include <gio/gio.h>
+ #include <glib-unix.h>
+ #include <sysexits.h>
++#include <pwd.h>
+ #include <systemd/sd-login.h>
+
+ #define GDM_DBUS_NAME                        "org.gnome.DisplayManager"
+@@ -78,8 +79,17 @@ on_display_added (GDBusObjectManager *displays,
+
+         g_variant_get (reply, "(s)", &session_id);
+
+-        if (sd_session_get_username (session_id, &username) < 0)
+-                return;
++        {
++                uid_t uid;
++                struct passwd *pw = NULL;
++
++                if (sd_session_get_uid (session_id, &uid) >= 0)
++                        pw = getpwuid (uid);
++
++                username = pw ? g_strdup (pw->pw_name) : NULL;
++                if (username == NULL)
++                        return;
++        }
+
+         if (g_strcmp0 (state->username, username) == 0) {
+                 g_print ("Session started\n");

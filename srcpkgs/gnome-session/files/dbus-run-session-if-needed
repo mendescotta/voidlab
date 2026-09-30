@@ -1,0 +1,9 @@
+#!/bin/sh
+# gnome-session >= 49 aborts ("No session bus running!") unless a session
+# bus already exists; upstream relies on systemd --user providing one at
+# $XDG_RUNTIME_DIR/bus. Display managers other than GDM (e.g. lightdm)
+# don't start one, so spawn a bus for the session only when missing.
+if [ -n "$DBUS_SESSION_BUS_ADDRESS" ] || [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+	exec "$@"
+fi
+exec dbus-run-session -- "$@"

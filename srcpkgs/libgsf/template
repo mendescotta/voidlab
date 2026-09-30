@@ -1,0 +1,33 @@
+# Template file for 'libgsf'
+pkgname=libgsf
+version=1.14.60
+revision=1
+build_style=gnu-configure
+build_helper="gir"
+configure_args="--disable-static --enable-introspection"
+hostmakedepends="automake libtool gettext-devel glib-devel intltool pkg-config gtk-doc"
+makedepends="gdk-pixbuf-devel libxml2-devel"
+checkdepends="perl-XML-Parser unzip"
+short_desc="Structured File Library"
+maintainer="Orphaned <orphan@voidlinux.org>"
+license="LGPL-2.1-or-later"
+homepage="https://www.gnome.org/"
+changelog="https://gitlab.gnome.org/GNOME/libgsf/-/raw/master/ChangeLog"
+distfiles="${GNOME_SITE}/libgsf/${version%.*}/${pkgname}-${version}.tar.xz"
+checksum=83e12c36a099a8a7019bf425e2c24af66eeb2ef5874251e694431a07d9805dae
+
+pre_configure() {
+	autoreconf -fi
+}
+
+libgsf-devel_package() {
+	depends="libglib-devel libxml2-devel ${sourcepkg}>=${version}_${revision}"
+	short_desc+=" - development files"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		vmove usr/share/gtk-doc
+		vmove usr/share/gir-1.0
+		vmove "usr/lib/*.so"
+	}
+}
