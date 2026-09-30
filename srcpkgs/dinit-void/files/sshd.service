@@ -1,0 +1,7 @@
+# OpenSSH daemon
+type = process
+command = /usr/bin/sshd -D
+smooth-recovery = true
+depends-on: ssh-keygen
+depends-on: local.target
+after: network.target

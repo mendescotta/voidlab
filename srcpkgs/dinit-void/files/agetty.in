@@ -1,0 +1,7 @@
+# getty on @TTY@
+type = process
+command = /usr/lib/dinit/agetty-default @TTY@
+restart = true
+smooth-recovery = true
+termsignal = HUP
+depends-on: login.target

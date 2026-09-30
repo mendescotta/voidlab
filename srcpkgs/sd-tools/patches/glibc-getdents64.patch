@@ -1,0 +1,16 @@
+glibc has no getdents(); use getdents64() (glibc >= 2.30), whose buffer
+layout matches glibc's struct dirent. The SYS_getdents shims used in
+dinit-chimera#34 and Casuarina return the legacy linux_dirent layout
+(d_type after the name), which misparses every entry name.
+
+--- a/src/shared/copy.c
++++ b/src/shared/copy.c
+@@ -908,7 +908,7 @@
+                 struct dirent *de;
+                 ssize_t n;
+
+-                n = getdents(fd, buf, m);
++                n = getdents64(fd, buf, m);
+                 if (n < 0)
+                         return -errno;
+                 if (n == 0)

@@ -1,0 +1,7 @@
+# DHCP client for all interfaces
+type = process
+command = /usr/bin/dhcpcd -B -M
+smooth-recovery = true
+depends-on: pre-network.target
+depends-on: local.target
+before: network.target

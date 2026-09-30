@@ -1,0 +1,20 @@
+# Template file for 'dinit-chimera'
+pkgname=dinit-chimera
+version=0.99.25
+revision=1
+build_style=meson
+configure_args="-Ddefault-path-env=/usr/bin"
+hostmakedepends="pkg-config"
+makedepends="libkmod-devel"
+# dinit-devd/dinit-console helpers come from dinit-void (Void glue)
+depends="dinit sd-tools kmod util-linux"
+short_desc="Chimera Linux core services suite for dinit"
+maintainer="mendescotta <mendescotta@gmail.com>"
+license="BSD-2-Clause"
+homepage="https://github.com/chimera-linux/dinit-chimera"
+distfiles="https://github.com/chimera-linux/dinit-chimera/archive/v${version}.tar.gz"
+checksum=777dbee5a69f96a1a4cd812c7fa3dce62a7247a4be99420832a778e548c357f7
+
+post_install() {
+	vlicense COPYING.md
+}

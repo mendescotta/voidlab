@@ -1,0 +1,18 @@
+# Template file for 'base-system-dinit'
+pkgname=base-system-dinit
+version=0.1
+revision=1
+metapackage=yes
+# Void's base-system with dinit + dinit-chimera instead of runit-void, and
+# chimerautils instead of GNU coreutils. Keep in sync with base-system.
+depends="base-files>=0.77 ncurses chimerautils findutils diffutils
+ dash bash grep gzip file sed gawk less util-linux which tar man-pages
+ mdocml>=1.13.3 shadow e2fsprogs btrfs-progs xfsprogs f2fs-tools dosfstools
+ procps-ng tzdata pciutils usbutils iana-etc openssh dhcpcd kbd iproute2
+ iputils iw wpa_supplicant xbps nvi sudo wifi-firmware void-artwork
+ traceroute ethtool kmod acpid eudev removed-packages glibc-locales linux
+ dinit dinit-chimera dinit-void sd-tools"
+short_desc="Void Linux base system meta package (dinit-chimera, chimerautils)"
+maintainer="mendescotta <mendescotta@gmail.com>"
+license="Public Domain"
+homepage="https://github.com/mendescotta"

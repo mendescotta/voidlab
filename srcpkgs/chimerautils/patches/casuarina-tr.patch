@@ -1,0 +1,151 @@
+commit 3359e3158dac0efd8614300ce585d3f582ae4af6
+Author: Wesley Moore <wes@wezm.net>
+Date:   Mon Mar 2 17:49:58 2026 +1000
+
+    tr: use bytes instead of wide chars
+    
+    tr uses wide chars and getwchar, which works when LC_CHAR=C on FreeBSD
+    and musl, but causes an error on glibc. Change tr to just operate on
+    plain bytes.
+
+diff --git a/src.freebsd/coreutils/tr/tr.c b/src.freebsd/coreutils/tr/tr.c
+index 8a925e9..031bafb 100644
+--- a/src.freebsd/coreutils/tr/tr.c
++++ b/src.freebsd/coreutils/tr/tr.c
+@@ -43,13 +43,13 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
+-#include <wchar.h>
+-#include <wctype.h>
+ 
+ #include "cmap.h"
+ #include "cset.h"
+ #include "extern.h"
+ 
++#define isrune(v) (isprint(v) || iscntrl(v))
++
+ static STR s1 = { STRING1, NORMAL, 0, OOBCH, 0, { 0, OOBCH }, NULL, NULL };
+ static STR s2 = { STRING2, NORMAL, 0, OOBCH, 0, { 0, OOBCH }, NULL, NULL };
+ 
+@@ -64,7 +64,7 @@ main(int argc, char **argv)
+ 	struct cset *delete, *squeeze;
+ 	int n, *p;
+ 	int Cflag, cflag, dflag, sflag, isstring2;
+-	wint_t ch, cnt, lastch;
++	int ch, cnt, lastch;
+ 	int optc;
+ 
+ 	(void)setlocale(LC_ALL, "");
+@@ -128,11 +128,11 @@ main(int argc, char **argv)
+ 		delete = setup(argv[0], &s1, cflag, Cflag);
+ 		squeeze = setup(argv[1], &s2, 0, 0);
+ 
+-		for (lastch = OOBCH; (ch = getwchar()) != WEOF;)
++		for (lastch = OOBCH; (ch = getchar()) != EOF;)
+ 			if (!cset_in(delete, ch) &&
+ 			    (lastch != ch || !cset_in(squeeze, ch))) {
+ 				lastch = ch;
+-				(void)putwchar(ch);
++				(void)putchar(ch);
+ 			}
+ 		if (ferror(stdin))
+ 			err(1, NULL);
+@@ -149,9 +149,9 @@ main(int argc, char **argv)
+ 
+ 		delete = setup(argv[0], &s1, cflag, Cflag);
+ 
+-		while ((ch = getwchar()) != WEOF)
++		while ((ch = getchar()) != EOF)
+ 			if (!cset_in(delete, ch))
+-				(void)putwchar(ch);
++				(void)putchar(ch);
+ 		if (ferror(stdin))
+ 			err(1, NULL);
+ 		exit(0);
+@@ -164,10 +164,10 @@ main(int argc, char **argv)
+ 	if (sflag && !isstring2) {
+ 		squeeze = setup(argv[0], &s1, cflag, Cflag);
+ 
+-		for (lastch = OOBCH; (ch = getwchar()) != WEOF;)
++		for (lastch = OOBCH; (ch = getchar()) != EOF;)
+ 			if (lastch != ch || !cset_in(squeeze, ch)) {
+ 				lastch = ch;
+-				(void)putwchar(ch);
++				(void)putchar(ch);
+ 			}
+ 		if (ferror(stdin))
+ 			err(1, NULL);
+@@ -217,7 +217,7 @@ main(int argc, char **argv)
+ 			do {
+ 				ch = towupper(s1.lastch);
+ 				cmap_add(map, s1.lastch, ch);
+-				if (sflag && iswupper(ch))
++				if (sflag && isupper(ch))
+ 					cset_add(squeeze, ch);
+ 				if (!next(&s1))
+ 					goto endloop;
+@@ -234,7 +234,7 @@ main(int argc, char **argv)
+ 			do {
+ 				ch = towlower(s1.lastch);
+ 				cmap_add(map, s1.lastch, ch);
+-				if (sflag && iswlower(ch))
++				if (sflag && islower(ch))
+ 					cset_add(squeeze, ch);
+ 				if (!next(&s1))
+ 					goto endloop;
+@@ -301,8 +301,8 @@ endloop:
+ 		 */
+ 		s2.str = argv[1];
+ 		s2.state = NORMAL;
+-		for (cnt = 0; cnt < WINT_MAX; cnt++) {
+-			if (Cflag && !iswrune(cnt))
++		for (cnt = 0; cnt < UINT8_MAX; cnt++) {
++			if (Cflag && !isrune(cnt))
+ 				continue;
+ 			if (cmap_lookup(map, cnt) == OOBCH) {
+ 				if (next(&s2)) {
+@@ -319,7 +319,7 @@ endloop:
+ 		cmap_default(map, s2.lastch);
+ 	} else if (Cflag) {
+ 		for (p = carray, cnt = 0; cnt < NCHARS_SB; cnt++) {
+-			if (cmap_lookup(map, cnt) == OOBCH && iswrune(cnt))
++			if (cmap_lookup(map, cnt) == OOBCH && isrune(cnt))
+ 				*p++ = cnt;
+ 			else
+ 				cmap_add(map, cnt, cnt);
+@@ -330,7 +330,7 @@ endloop:
+ 
+ 		s2.str = argv[1];
+ 		s2.state = NORMAL;
+-		for (cnt = 0; cnt < (wint_t)n; cnt++) {
++		for (cnt = 0; cnt < n; cnt++) {
+ 			(void)next(&s2);
+ 			cmap_add(map, carray[cnt], s2.lastch);
+ 			/*
+@@ -347,19 +347,19 @@ endloop:
+ 	cmap_cache(map);
+ 
+ 	if (sflag)
+-		for (lastch = OOBCH; (ch = getwchar()) != WEOF;) {
+-			if (!Cflag || iswrune(ch))
++		for (lastch = OOBCH; (ch = getchar()) != EOF;) {
++			if (!Cflag || isrune(ch))
+ 				ch = cmap_lookup(map, ch);
+ 			if (lastch != ch || !cset_in(squeeze, ch)) {
+ 				lastch = ch;
+-				(void)putwchar(ch);
++				(void)putchar(ch);
+ 			}
+ 		}
+ 	else
+-		while ((ch = getwchar()) != WEOF) {
+-			if (!Cflag || iswrune(ch))
++		while ((ch = getchar()) != EOF) {
++			if (!Cflag || isrune(ch))
+ 				ch = cmap_lookup(map, ch);
+-			(void)putwchar(ch);
++			(void)putchar(ch);
+ 		}
+ 	if (ferror(stdin))
+ 		err(1, NULL);

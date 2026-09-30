@@ -1,0 +1,58 @@
+# Template file for 'chimerautils'
+pkgname=chimerautils
+version=15.1.1
+revision=1
+build_style=meson
+# Everything lives under /usr/lib/chimerautils; post_install exposes only the
+# coreutils set in /usr/bin. GNU grep/sed/find/awk/diff/gzip stay default on
+# Void (base-system and xbps-src rely on them); the BSD ones are reachable
+# via /usr/lib/chimerautils/bin.
+configure_args="--bindir=/usr/lib/chimerautils/bin
+ --sbindir=/usr/lib/chimerautils/bin
+ --libexecdir=/usr/lib/chimerautils
+ --mandir=/usr/share/chimerautils/man
+ -Dchimera_realpath=enabled"
+hostmakedepends="pkg-config flex byacc"
+makedepends="acl-devel bzip2-devel libedit-devel libxo-devel ncurses-devel
+ openssl-devel liblzma-devel zlib-devel libzstd-devel libbsd-devel"
+short_desc="Chimera Linux core userland (FreeBSD-derived)"
+maintainer="mendescotta <mendescotta@gmail.com>"
+license="BSD-2-Clause"
+homepage="https://github.com/chimera-linux/chimerautils"
+distfiles="https://github.com/chimera-linux/chimerautils/archive/refs/tags/v${version}.tar.gz"
+checksum=18c558f0165af078a1a213617c2241d80164dc846ffb05c49f22a476720df773
+
+conflicts="coreutils>=0"
+provides="coreutils-9.4_3"
+
+# Program names shipped in /usr/bin by GNU coreutils 9.4.
+_gnu_coreutils="[ arch b2sum base32 base64 basename basenc cat chcon chgrp
+ chmod chown chroot cksum comm cp csplit cut date dd df dir dircolors dirname
+ du echo env expand expr factor false fmt fold groups head hostid id install
+ join link ln logname ls md5sum mkdir mkfifo mknod mktemp mv nice nl nohup
+ nproc numfmt od paste pathchk pinky pr printenv printf ptx pwd readlink
+ realpath rm rmdir runcon seq sha1sum sha224sum sha256sum sha384sum sha512sum
+ shred shuf sleep sort split stat stdbuf stty sum sync tac tail tee test
+ timeout touch tr true truncate tsort tty uname unexpand uniq unlink users
+ vdir wc who whoami yes"
+
+post_install() {
+	local bin=${DESTDIR}/usr/lib/chimerautils/bin b src missing=
+	vlicense LICENSE
+	vmkdir usr/bin
+	for b in ${_gnu_coreutils}; do
+		src=$b
+		if [ "$b" = install ] && [ ! -e "$bin/install" ]; then
+			src=xinstall
+		fi
+		if [ -e "$bin/$src" ]; then
+			ln -s "../lib/chimerautils/bin/$src" "${DESTDIR}/usr/bin/$b"
+		else
+			missing="$missing $b"
+		fi
+	done
+	# Record the gap so it can be reviewed (and filled) deliberately.
+	vmkdir usr/share/doc/chimerautils
+	echo "${missing# }" > "${DESTDIR}/usr/share/doc/chimerautils/gnu-coreutils-missing"
+	msg_normal "chimerautils: GNU coreutils names not provided:${missing}\n"
+}

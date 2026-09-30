@@ -1,0 +1,14 @@
+# Template file for 'sd-tools'
+pkgname=sd-tools
+version=0.99.0
+revision=1
+build_style=meson
+configure_args="-Dtests=false -Dacl=enabled"
+hostmakedepends="pkg-config"
+makedepends="acl-devel libcap-devel"
+short_desc="Standalone systemd-tmpfiles and systemd-sysusers (Chimera)"
+maintainer="mendescotta <mendescotta@gmail.com>"
+license="LGPL-2.1-or-later"
+homepage="https://github.com/chimera-linux/sd-tools"
+distfiles="https://github.com/chimera-linux/sd-tools/archive/refs/tags/v${version}.tar.gz"
+checksum=09ffbc8bfe1f660d4918fd50dff51db1686ac9b3bd45c7ddcbf27b0470394da3

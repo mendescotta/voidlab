@@ -1,0 +1,36 @@
+# Template file for 'dinit-void'
+pkgname=dinit-void
+version=0.1
+revision=1
+# Void glue for dinit-chimera: device/console helpers, /usr/bin/init and the
+# power commands, and base services (gettys, dhcpcd, sshd).
+depends="dinit dinit-chimera eudev kbd util-linux"
+short_desc="Void Linux integration for dinit-chimera"
+maintainer="mendescotta <mendescotta@gmail.com>"
+license="BSD-2-Clause"
+homepage="https://github.com/mendescotta"
+# owns /usr/bin/{init,shutdown,halt,poweroff,reboot} like runit-void does
+conflicts="runit-void>=0"
+
+do_install() {
+	vinstall ${FILESDIR}/dinit-devd 755 usr/libexec
+	vinstall ${FILESDIR}/dinit-console 755 usr/libexec
+	vinstall ${FILESDIR}/agetty-default 755 usr/lib/dinit
+	vinstall ${FILESDIR}/ssh-keygen 755 usr/lib/dinit
+
+	vmkdir usr/bin
+	ln -s dinit ${DESTDIR}/usr/bin/init
+	local c
+	for c in shutdown halt poweroff reboot soft-reboot; do
+		ln -s dinit-$c ${DESTDIR}/usr/bin/$c
+	done
+
+	vmkdir etc/dinit.d
+	for c in 1 2 3 4 5 6 S0; do
+		sed "s/@TTY@/tty$c/g" ${FILESDIR}/agetty.in \
+			> ${DESTDIR}/etc/dinit.d/agetty-tty$c
+	done
+	for c in dhcpcd sshd ssh-keygen; do
+		vinstall ${FILESDIR}/$c.service 644 etc/dinit.d $c
+	done
+}
