@@ -1,13 +1,20 @@
 # Template file for 'dinit-chimera'
 pkgname=dinit-chimera
 version=0.99.25
-revision=1
+revision=3
 build_style=meson
 configure_args="-Ddefault-path-env=/usr/bin"
 hostmakedepends="pkg-config"
 makedepends="libkmod-devel"
 # dinit-devd/dinit-console helpers come from dinit-void (Void glue)
 depends="dinit sd-tools kmod util-linux"
+# ships /usr/bin/init (a wrapper that execs dinit), as runit-void does
+conflicts="runit-void>=0"
+# service enablement dirs (the boot/system targets' waits-for.d); tmpfiles
+# only creates them at boot, too late for tools that enable services offline
+make_dirs="
+ /etc/dinit.d/boot.d 0755 root root
+ /usr/lib/dinit.d/boot.d 0755 root root"
 short_desc="Chimera Linux core services suite for dinit"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause"

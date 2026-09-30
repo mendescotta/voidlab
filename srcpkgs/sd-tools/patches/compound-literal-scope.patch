@@ -1,0 +1,29 @@
+tmpfiles: keep the system config dir list alive for all of run().
+
+CONF_PATHS_STRV() is a compound literal. Created inside the switch body its
+lifetime ends with the switch, but config_dirs is used afterwards. clang
+(Chimera's compiler) happens to keep the storage; GCC with -O2/LTO reuses
+it, and sd-tmpfiles segfaults in chase() on garbage pointers. This is the
+"sd-tmpfiles prevents boot" failure from dinit-chimera#34.
+
+--- a/src/tmpfiles/tmpfiles.c	2026-09-30 17:23:58.654000724 +0300
++++ b/src/tmpfiles/tmpfiles.c	2026-09-30 17:23:58.675797079 +0300
+@@ -5479,6 +5479,9 @@
+ 
+ static int run(int argc, char **argv) {
+         _cleanup_strv_free_ char **config_dirsp = NULL;
++        /* function scope: a compound literal inside the switch below would
++         * die with the switch block while config_dirs is still used */
++        char **system_config_dirs = CONF_PATHS_STRV("tmpfiles.d");
+         _cleanup_(context_done) Context c = {};
+         char **config_dirs = NULL;
+         bool invalid_config = false;
+@@ -5549,7 +5552,7 @@
+                 break;
+ 
+         case RUNTIME_SCOPE_SYSTEM:
+-                config_dirs = CONF_PATHS_STRV("tmpfiles.d");
++                config_dirs = system_config_dirs;
+                 break;
+ 
+         default:

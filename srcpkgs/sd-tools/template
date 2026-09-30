@@ -1,7 +1,7 @@
 # Template file for 'sd-tools'
 pkgname=sd-tools
 version=0.99.0
-revision=1
+revision=2
 build_style=meson
 configure_args="-Dtests=false -Dacl=enabled"
 hostmakedepends="pkg-config"

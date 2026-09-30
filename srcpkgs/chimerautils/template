@@ -1,12 +1,13 @@
 # Template file for 'chimerautils'
 pkgname=chimerautils
 version=15.1.1
-revision=1
+revision=3
 build_style=meson
-# Everything lives under /usr/lib/chimerautils; post_install exposes only the
-# coreutils set in /usr/bin. GNU grep/sed/find/awk/diff/gzip stay default on
-# Void (base-system and xbps-src rely on them); the BSD ones are reachable
-# via /usr/lib/chimerautils/bin.
+# Everything lives under /usr/lib/chimerautils and co-installs with GNU
+# coreutils. dracut needs GNU stat (-c %s/%m/%a/%Y, -f -c %T) in the build
+# and in the live initramfs, so GNU stays the system userland in /usr/bin.
+# /usr/lib/chimerautils/coreutils holds the coreutils set only, and
+# /etc/profile.d/chimerautils.sh puts it first in PATH for login shells.
 configure_args="--bindir=/usr/lib/chimerautils/bin
  --sbindir=/usr/lib/chimerautils/bin
  --libexecdir=/usr/lib/chimerautils
@@ -22,10 +23,8 @@ homepage="https://github.com/chimera-linux/chimerautils"
 distfiles="https://github.com/chimera-linux/chimerautils/archive/refs/tags/v${version}.tar.gz"
 checksum=18c558f0165af078a1a213617c2241d80164dc846ffb05c49f22a476720df773
 
-conflicts="coreutils>=0"
-provides="coreutils-9.4_3"
-
-# Program names shipped in /usr/bin by GNU coreutils 9.4.
+# Program names shipped in /usr/bin by GNU coreutils 9.4; the ones
+# chimerautils has are linked into /usr/lib/chimerautils/coreutils.
 _gnu_coreutils="[ arch b2sum base32 base64 basename basenc cat chcon chgrp
  chmod chown chroot cksum comm cp csplit cut date dd df dir dircolors dirname
  du echo env expand expr factor false fmt fold groups head hostid id install
@@ -39,14 +38,17 @@ _gnu_coreutils="[ arch b2sum base32 base64 basename basenc cat chcon chgrp
 post_install() {
 	local bin=${DESTDIR}/usr/lib/chimerautils/bin b src missing=
 	vlicense LICENSE
-	vmkdir usr/bin
+	# nvi's recovery script; Void's nvi package owns /usr/share/vi and
+	# provides vi (chimerautils' vi isn't exposed in /usr/bin).
+	rm -rf ${DESTDIR}/usr/share/vi
+	vmkdir usr/lib/chimerautils/coreutils
 	for b in ${_gnu_coreutils}; do
 		src=$b
 		if [ "$b" = install ] && [ ! -e "$bin/install" ]; then
 			src=xinstall
 		fi
 		if [ -e "$bin/$src" ]; then
-			ln -s "../lib/chimerautils/bin/$src" "${DESTDIR}/usr/bin/$b"
+			ln -s "../bin/$src" "${DESTDIR}/usr/lib/chimerautils/coreutils/$b"
 		else
 			missing="$missing $b"
 		fi
@@ -55,4 +57,5 @@ post_install() {
 	vmkdir usr/share/doc/chimerautils
 	echo "${missing# }" > "${DESTDIR}/usr/share/doc/chimerautils/gnu-coreutils-missing"
 	msg_normal "chimerautils: GNU coreutils names not provided:${missing}\n"
+	vinstall ${FILESDIR}/chimerautils.sh 644 etc/profile.d
 }

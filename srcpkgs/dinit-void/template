@@ -1,15 +1,15 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.1
-revision=1
-# Void glue for dinit-chimera: device/console helpers, /usr/bin/init and the
-# power commands, and base services (gettys, dhcpcd, sshd).
+revision=2
+# Void glue for dinit-chimera: device/console helpers, the power commands
+# (/usr/bin/init itself is dinit-chimera's env-cleaning wrapper), and base services (gettys, dhcpcd, sshd).
 depends="dinit dinit-chimera eudev kbd util-linux"
 short_desc="Void Linux integration for dinit-chimera"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause"
 homepage="https://github.com/mendescotta"
-# owns /usr/bin/{init,shutdown,halt,poweroff,reboot} like runit-void does
+# owns /usr/bin/{shutdown,halt,poweroff,reboot} like runit-void does
 conflicts="runit-void>=0"
 
 do_install() {
@@ -19,7 +19,6 @@ do_install() {
 	vinstall ${FILESDIR}/ssh-keygen 755 usr/lib/dinit
 
 	vmkdir usr/bin
-	ln -s dinit ${DESTDIR}/usr/bin/init
 	local c
 	for c in shutdown halt poweroff reboot soft-reboot; do
 		ln -s dinit-$c ${DESTDIR}/usr/bin/$c
