@@ -15,6 +15,11 @@ die()  { echo "voidlab: $*" >&2; exit 1; }
 need() { local t; for t; do command -v "$t" >/dev/null || die "missing tool: $t"; done; }
 need_upstream() { [ -d "$UP/.git" ] || die "no upstream checkout; run: voidlab sync"; }
 xsrc() { (cd "$UP" && ./xbps-src -H "$HOSTDIR" -m "$MASTERDIR" "$@"); }
+# Anything that rewrites .upstream must not run under an active build.
+no_running_build() {
+	need pgrep
+	if pgrep -x xbps-src >/dev/null; then die "another xbps-src build is running"; fi
+}
 
 # version_revision of a template (file path, or - for stdin); fails if
 # version uses a variable or either field is missing.
@@ -35,6 +40,7 @@ merge_shlibs() {
 
 cmd_overlay() {
 	need_upstream
+	no_running_build
 	git -C "$UP" reset -q --hard
 	git -C "$UP" clean -qfdx
 	local p e name
@@ -58,6 +64,7 @@ cmd_overlay() {
 
 cmd_sync() {
 	need git
+	no_running_build
 	if [ -d "$UP/.git" ]; then
 		git -C "$UP" fetch -q --depth 1 origin master
 		git -C "$UP" reset -q --hard FETCH_HEAD
@@ -70,12 +77,14 @@ cmd_sync() {
 	fi
 }
 
+# Copy the packages produced since marker file $1 into repo/ and index it.
+# Only this run's output is copied, so pruned old versions stay pruned.
 index_repo() {
-	local f
+	local marker=$1 f
 	mkdir -p "$REPO"
 	while IFS= read -r -d '' f; do
-		cp -u "$f" "$REPO/"
-	done < <(find "$HOSTDIR/binpkgs" -name '*.xbps' -print0 2>/dev/null)
+		cp "$f" "$REPO/"
+	done < <(find "$HOSTDIR/binpkgs" -name '*.xbps' -newer "$marker" -print0 2>/dev/null)
 	shopt -s nullglob
 	set -- "$REPO"/*.xbps
 	shopt -u nullglob
@@ -88,30 +97,34 @@ cmd_build() {
 	[ $# -gt 0 ] || die "usage: voidlab build <pkg>..."
 	need git xbps-rindex
 	need_upstream
-	if pgrep -x xbps-src >/dev/null; then die "another xbps-src build is running"; fi
 	cmd_overlay
 	local p log
 	for p; do
 		[ -f "$UP/srcpkgs/$p/template" ] || die "no such package: $p"
 	done
 	mkdir -p "$HOSTDIR"
+	local marker=$HOSTDIR/.voidlab-build-start
+	touch "$marker"
 	for p; do
 		log=$HOSTDIR/voidlab-build-$p.log
 		echo "=> $p"
 		if ! xsrc pkg "$p" > "$log" 2>&1; then
 			tail -n 30 "$log" >&2
-			die "build failed: $p (full log: $log)"
+			index_repo "$marker"
+			die "build failed: $p (full log: $log); earlier packages were indexed"
 		fi
 	done
-	index_repo
+	index_repo "$marker"
 }
 
 cmd_status() {
 	need_upstream
-	need xbps-uhelper
-	# Compare against pristine upstream: drop any overlay left by build.
-	git -C "$UP" reset -q --hard
-	git -C "$UP" clean -qfdx
+	need xbps-uhelper xbps-query
+	# Read-only: upstream templates come from HEAD, never the working tree,
+	# which may hold an overlay (or a running build).
+	local pristine
+	pristine=$(mktemp -d)
+	trap 'rm -rf "$pristine"' RETURN
 	local e p ours theirs verdict rc built
 	printf '%-30s %-22s %-22s %-12s %s\n' PACKAGE OURS UPSTREAM VERDICT REPO
 	for e in "$ROOT"/srcpkgs/*; do
@@ -135,8 +148,9 @@ cmd_status() {
 			case $rc in
 			1) verdict=ahead ;;
 			255) verdict=behind ;;
-			*) if git -C "$UP" diff --quiet --no-index "$e" "$UP/srcpkgs/$p" 2>/dev/null; then
-				verdict=redundant; else verdict=same-ver; fi ;;
+			*) git -C "$UP" archive HEAD "srcpkgs/$p" | tar -x -C "$pristine"
+				if diff -rq "$e" "$pristine/srcpkgs/$p" >/dev/null 2>&1; then
+					verdict=redundant; else verdict=same-ver; fi ;;
 			esac
 		fi
 		built=$(xbps-query -i --repository="$REPO" -p pkgver "$p" 2>/dev/null || true)
