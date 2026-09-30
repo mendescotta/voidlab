@@ -1,0 +1,32 @@
+# Void: generate missing host keys first (upstream assumes they exist),
+# and no syslog dependency (Void ships no /sbin/syslogd).
+[service]
+name = "sshd"
+exec = ["/bin/sh", "-c", "/usr/bin/ssh-keygen -A && exec /usr/bin/sshd -D -e"]
+type = "simple"
+
+[service.user]
+user = "root"
+group = "root"
+
+[restart]
+policy = "permanent"
+delay = "1s"
+max-restarts = 10
+max-restart-window = "60s"
+
+[readiness]
+type = "tcp-port"
+port = 22
+timeout = "15s"
+
+[dependencies]
+requires = ["network"]
+
+[cgroup]
+memory-max = "256M"
+pids-max = 128
+
+[shutdown]
+stop-signal = "SIGTERM"
+stop-timeout = "10s"

@@ -1,0 +1,151 @@
+# Template file for 'dynamod'
+#
+# Mirrored in spirit from dynamod's own dist/void/template (see build.sh
+# in void-dynamod-iso for why the ISO build doesn't depend on that
+# upstream template already being staged), adapted for glibc: vendors
+# Zig 0.15.2 directly (Void's packaged zig is 0.13.0, dynamod requires
+# >=0.15.2), builds the sdnotify shim and PAM module the upstream draft
+# template omits, and drops the musl-only makedepends.
+#
+# Tracks a specific commit rather than a release (dynamod has no tagged
+# releases yet).
+_commit=3776c3fb66182a981a05ace4fa9d8634f9a76cd2
+_zig_version=0.15.2
+pkgname=dynamod
+version=0.1.0
+revision=2
+hostmakedepends="cargo pkg-config tar xz"
+makedepends=""
+depends="dbus"
+short_desc="Zig+Rust PID 1 init system with OTP supervisor trees"
+maintainer="gui <mendescotta@gmail.com>"
+license="MIT"
+homepage="https://github.com/sinisterMage/dynamod"
+distfiles="https://github.com/sinisterMage/dynamod/archive/${_commit}.tar.gz>dynamod-${_commit}.tar.gz
+ https://ziglang.org/download/${_zig_version}/zig-x86_64-linux-${_zig_version}.tar.xz"
+checksum="26683f3df71c3dbaf82795ff8c8379d720eb246d04a0e84e459c2df3d4c50489
+ 02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239"
+skip_extraction="zig-x86_64-linux-${_zig_version}.tar.xz"
+wrksrc="dynamod-${_commit}"
+
+post_extract() {
+	# The Zig tarball is skip_extraction'd (it's a toolchain, not source);
+	# extract it into a build-only scratch dir that never gets vinstall'd.
+	mkdir -p "${XBPS_BUILDDIR}/zig-toolchain"
+	tar xJf "${XBPS_SRCDISTDIR}/${pkgname}-${version}/zig-x86_64-linux-${_zig_version}.tar.xz" \
+		-C "${XBPS_BUILDDIR}/zig-toolchain" --strip-components=1
+}
+
+do_build() {
+	local zig="${XBPS_BUILDDIR}/zig-toolchain/zig"
+
+	cd zig
+	"${zig}" build
+
+	cd "${wrksrc}/rust"
+	local _rustroot
+	_rustroot="$(pwd)"
+	# rust/.cargo/config.toml hardcodes `target = "x86_64-unknown-linux-musl"`
+	# project-wide, so every invocation needs an explicit --target to
+	# override it for a glibc build -- output always lands at
+	# rust/target/x86_64-unknown-linux-gnu/release/, never rust/target/release/.
+	cargo build --release --workspace --target x86_64-unknown-linux-gnu
+
+	# Excluded from the workspace (rust/Cargo.toml's own `exclude`) --
+	# `-p` from the workspace root can't select them ("did not match any
+	# packages": exclude blocks -p resolution), and cargo's own workspace
+	# auto-discovery explicitly refuses to attach an excluded package to
+	# the workspace it's excluded from, for ANY purpose -- including
+	# `version.workspace = true` / `edition.workspace = true` inheritance,
+	# which dynamod-sdnotify's manifest uses despite being excluded (an
+	# upstream inconsistency: "failed to find a workspace root" when
+	# built from its own directory). Patch the two inherited keys to the
+	# workspace's actual literal values (rust/Cargo.toml's
+	# [workspace.package]: version = "0.1.0", edition = "2024") so the
+	# manifest is self-sufficient, then build each as a standalone crate
+	# with an explicit --target-dir pointing at the shared rust/target/,
+	# matching where do_install (and upstream's own
+	# tools/install-sdnotify.sh) expects the output.
+	sed -i 's/^version\.workspace = true/version = "0.1.0"/; s/^edition\.workspace = true/edition = "2024"/' \
+		dynamod-sdnotify/Cargo.toml
+	( cd dynamod-sdnotify && cargo build --release --target x86_64-unknown-linux-gnu --target-dir "${_rustroot}/target" )
+	( cd pam_dynamod_logind && cargo build --release --target x86_64-unknown-linux-gnu --target-dir "${_rustroot}/target" )
+}
+
+do_install() {
+	local _zigout="zig/zig-out/bin"
+	local _rustout="rust/target/x86_64-unknown-linux-gnu/release"
+	local _rustgnu="rust/target/x86_64-unknown-linux-gnu/release"
+
+	vbin "${_zigout}/dynamod-init"
+
+	vmkdir usr/lib/dynamod
+	vinstall "${_rustout}/dynamod-svmgr" 755 usr/lib/dynamod
+	vinstall "${_rustout}/dynamod-logd" 755 usr/lib/dynamod
+	vinstall "${_rustout}/dynamod-logind" 755 usr/lib/dynamod
+	vinstall "${_rustout}/dynamod-sd1bridge" 755 usr/lib/dynamod
+	vinstall "${_rustout}/dynamod-hostnamed" 755 usr/lib/dynamod
+	vinstall "${_rustout}/dynamodctl" 755 usr/bin
+
+	# systemd-shim library. Cargo's cdylib output is always lib<name>.so;
+	# [lib] name = "systemd" in dynamod-sdnotify's Cargo.toml gives us
+	# libsystemd.so directly -- install as the real libsystemd's versioned
+	# name + dev/runtime symlinks (mirrors tools/install-sdnotify.sh).
+	vinstall "${_rustgnu}/libsystemd.so" 755 usr/lib libsystemd.so.0.0.0
+	ln -sf libsystemd.so.0.0.0 "${DESTDIR}/usr/lib/libsystemd.so.0"
+	ln -sf libsystemd.so.0 "${DESTDIR}/usr/lib/libsystemd.so"
+
+	# PAM module. Cargo's cdylib naming gives libpam_dynamod_logind.so;
+	# PAM requires the "pam_" prefix without "lib" -- rename on install.
+	vmkdir usr/lib/security
+	vinstall "${_rustgnu}/libpam_dynamod_logind.so" 755 usr/lib/security \
+		pam_dynamod_logind.so
+
+	vmkdir etc/dynamod/supervisors
+	for f in config/supervisors/*.toml; do
+		vinstall "$f" 644 etc/dynamod/supervisors
+	done
+
+	# Void adaptation of upstream's config/services (written for a busybox
+	# system): enabled = /etc/dynamod/services. Desktop daemons (the
+	# "desktop" supervisor: logind/hostnamed/sd1bridge) ship disabled in
+	# /usr/share/dynamod/desktop-services; copy them into
+	# /etc/dynamod/services to enable. Dropped: examples (example, nginx,
+	# postgresql), syslog (/sbin/syslogd) and mdev-coldplug (/sbin/mdev),
+	# which Void doesn't ship (eudev handles devices via udev/udev-coldplug).
+	vmkdir etc/dynamod/services
+	vmkdir usr/share/dynamod/desktop-services
+	local f n
+	for f in config/services/*.toml; do
+		n=${f##*/}
+		case "$n" in
+		example.toml|nginx.toml|postgresql.toml|syslog.toml|mdev-coldplug.toml|agetty-*.toml|sshd.toml)
+			;;
+		dynamod-logind.toml|dynamod-hostnamed.toml|dynamod-sd1bridge.toml)
+			vinstall "$f" 644 usr/share/dynamod/desktop-services ;;
+		*)
+			vinstall "$f" 644 etc/dynamod/services ;;
+		esac
+	done
+	# syslog is dropped; order dbus after bootmisc (dirs) instead
+	sed -i 's/^after = \["syslog"\]$/after = ["bootmisc"]/' \
+		${DESTDIR}/etc/dynamod/services/dbus.toml
+	vinstall ${FILESDIR}/sshd.toml 644 etc/dynamod/services
+	for n in 1 2 3 4 5 6; do
+		sed -e "s/@TTY@/tty$n/g" -e 's/@EXTRA@//' -e 's/@BAUD@/38400/' -e 's/@TERM@/linux/' \
+			${FILESDIR}/agetty.toml.in > ${DESTDIR}/etc/dynamod/services/agetty-tty$n.toml
+	done
+	sed -e 's/@TTY@/ttyS0/g' -e 's/@EXTRA@/"-L", /' -e 's/@BAUD@/115200/' -e 's/@TERM@/vt100/' \
+		${FILESDIR}/agetty.toml.in > ${DESTDIR}/etc/dynamod/services/agetty-ttyS0.toml
+
+	vmkdir usr/share/dbus-1/system.d
+	for f in config/dbus-1/*.conf; do
+		vinstall "$f" 644 usr/share/dbus-1/system.d
+	done
+
+	vmkdir var/lib/dynamod
+	vmkdir var/log/dynamod
+
+	vdoc README.md
+	vlicense LICENSE
+}
