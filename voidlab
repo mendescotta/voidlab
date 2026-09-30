@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# voidlab — build custom xbps-src templates as an overlay on a stock
+# upstream void-packages checkout. See
+# docs/superpowers/specs/2026-09-30-voidlab-overlay-repo-design.md.
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+UP=$ROOT/.upstream
+HOSTDIR=$ROOT/hostdir
+MASTERDIR=$ROOT/masterdir
+REPO=$ROOT/repo
+UPSTREAM_URL=${VOIDLAB_UPSTREAM_URL:-https://github.com/void-linux/void-packages}
+
+die()  { echo "voidlab: $*" >&2; exit 1; }
+need() { local t; for t; do command -v "$t" >/dev/null || die "missing tool: $t"; done; }
+need_upstream() { [ -d "$UP/.git" ] || die "no upstream checkout; run: voidlab sync"; }
+xsrc() { (cd "$UP" && ./xbps-src -H "$HOSTDIR" -m "$MASTERDIR" "$@"); }
+
+# version_revision of a template (file path, or - for stdin); fails if
+# version uses a variable or either field is missing.
+tmpl_ver() {
+	awk -F= '/^version=/ { v = $2 } /^revision=/ { r = $2 }
+		END { gsub(/["\047]/, "", v); if (v == "" || r == "" || v ~ /\$/) exit 1; print v "_" r }' "$1"
+}
+
+merge_shlibs() {
+	local ov=$ROOT/common/shlibs up=$UP/common/shlibs dups
+	[ -s "$ov" ] || return 0
+	dups=$(awk '!/^#/ && NF { print $1 }' "$ov" | sort | uniq -d)
+	[ -z "$dups" ] || die "duplicate SONAME in common/shlibs: $dups"
+	awk 'NR == FNR { if (!/^#/ && NF) ov[$1] = 1; next } !($1 in ov)' "$ov" "$up" > "$up.new"
+	awk '!/^#/ && NF' "$ov" >> "$up.new"
+	mv "$up.new" "$up"
+}
+
+cmd_overlay() {
+	need_upstream
+	git -C "$UP" reset -q --hard
+	git -C "$UP" clean -qfdx
+	local p e name
+	if [ -f "$ROOT/common/removed-srcpkgs" ]; then
+		while read -r p; do
+			[ -n "$p" ] && rm -rf "${UP:?}/srcpkgs/$p"
+		done < "$ROOT/common/removed-srcpkgs"
+	fi
+	for e in "$ROOT"/srcpkgs/*; do
+		[ -e "$e" ] || [ -L "$e" ] || continue
+		name=${e##*/}
+		rm -rf "${UP:?}/srcpkgs/$name"
+		if [ -L "$e" ]; then cp -P "$e" "$UP/srcpkgs/$name"; else cp -a "$e" "$UP/srcpkgs/$name"; fi
+	done
+	merge_shlibs
+	for p in "$ROOT"/common/patches/*.patch; do
+		[ -e "$p" ] || continue
+		git -C "$UP" apply "$p" || die "patch does not apply: ${p##*/}"
+	done
+}
+
+cmd_sync() {
+	need git
+	if [ -d "$UP/.git" ]; then
+		git -C "$UP" fetch -q --depth 1 origin master
+		git -C "$UP" reset -q --hard FETCH_HEAD
+		git -C "$UP" clean -qfdx
+	else
+		git clone -q --depth 1 "$UPSTREAM_URL" "$UP"
+	fi
+	if [ -z "${VOIDLAB_NO_BOOTSTRAP:-}" ] && [ ! -d "$MASTERDIR" ]; then
+		xsrc binary-bootstrap
+	fi
+}
+
+index_repo() {
+	local f
+	mkdir -p "$REPO"
+	while IFS= read -r -d '' f; do
+		cp -u "$f" "$REPO/"
+	done < <(find "$HOSTDIR/binpkgs" -name '*.xbps' -print0 2>/dev/null)
+	shopt -s nullglob
+	set -- "$REPO"/*.xbps
+	shopt -u nullglob
+	[ $# -gt 0 ] || return 0
+	xbps-rindex -a "$@" >/dev/null
+	xbps-rindex -r "$REPO" >/dev/null
+}
+
+cmd_build() {
+	[ $# -gt 0 ] || die "usage: voidlab build <pkg>..."
+	need git xbps-rindex
+	need_upstream
+	if pgrep -x xbps-src >/dev/null; then die "another xbps-src build is running"; fi
+	cmd_overlay
+	local p log
+	for p; do
+		[ -f "$UP/srcpkgs/$p/template" ] || die "no such package: $p"
+	done
+	mkdir -p "$HOSTDIR"
+	for p; do
+		log=$HOSTDIR/voidlab-build-$p.log
+		echo "=> $p"
+		if ! xsrc pkg "$p" > "$log" 2>&1; then
+			tail -n 30 "$log" >&2
+			die "build failed: $p (full log: $log)"
+		fi
+	done
+	index_repo
+}
+
+cmd_status() {
+	need_upstream
+	need xbps-uhelper
+	# Compare against pristine upstream: drop any overlay left by build.
+	git -C "$UP" reset -q --hard
+	git -C "$UP" clean -qfdx
+	local e p ours theirs verdict rc built
+	printf '%-30s %-22s %-22s %-12s %s\n' PACKAGE OURS UPSTREAM VERDICT REPO
+	for e in "$ROOT"/srcpkgs/*; do
+		[ -L "$e" ] && continue
+		[ -d "$e" ] || continue
+		p=${e##*/}
+		if ! ours=$(tmpl_ver "$e/template"); then
+			printf '%-30s %-22s %-22s %s\n' "$p" "?" "-" "unparseable"
+			continue
+		fi
+		theirs=
+		if git -C "$UP" cat-file -e "HEAD:srcpkgs/$p/template" 2>/dev/null; then
+			theirs=$(git -C "$UP" show "HEAD:srcpkgs/$p/template" | tmpl_ver -) || theirs="?"
+		fi
+		if [ -z "$theirs" ]; then
+			verdict=new
+		elif [ "$theirs" = "?" ]; then
+			verdict=check
+		else
+			rc=0; xbps-uhelper cmpver "$ours" "$theirs" || rc=$?
+			case $rc in
+			1) verdict=ahead ;;
+			255) verdict=behind ;;
+			*) if git -C "$UP" diff --quiet --no-index "$e" "$UP/srcpkgs/$p" 2>/dev/null; then
+				verdict=redundant; else verdict=same-ver; fi ;;
+			esac
+		fi
+		built=$(xbps-query -i --repository="$REPO" -p pkgver "$p" 2>/dev/null || true)
+		if [ -z "$built" ]; then built=unbuilt
+		elif [ "$built" = "$p-$ours" ]; then built=ok
+		else built="stale(${built#"$p"-})"; fi
+		printf '%-30s %-22s %-22s %-12s %s\n' "$p" "$ours" "${theirs:--}" "$verdict" "$built"
+	done
+}
+
+case ${1:-} in
+sync)    shift; cmd_sync "$@" ;;
+overlay) shift; cmd_overlay "$@" ;;
+build)   shift; cmd_build "$@" ;;
+status)  shift; cmd_status "$@" ;;
+*) echo "usage: voidlab {sync|overlay|build <pkg>...|status}" >&2; exit 2 ;;
+esac
