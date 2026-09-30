@@ -108,7 +108,10 @@ cmd_build() {
 	for p; do
 		log=$HOSTDIR/voidlab-build-$p.log
 		echo "=> $p"
-		if ! xsrc pkg "$p" > "$log" 2>&1; then
+		# xbps-src resumes a failed build at its last stage, skipping
+		# extract/patch; start clean so template and patch edits apply.
+		xsrc clean "$p" > "$log" 2>&1 || true
+		if ! xsrc pkg "$p" >> "$log" 2>&1; then
 			tail -n 30 "$log" >&2
 			index_repo "$marker"
 			die "build failed: $p (full log: $log); earlier packages were indexed"

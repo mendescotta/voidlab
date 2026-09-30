@@ -25,6 +25,7 @@ cat > xbps-src <<'F'
 #!/bin/sh
 while [ $# -gt 0 ]; do case $1 in -H) H=$2; shift 2 ;; -m) shift 2 ;; *) break ;; esac; done
 case "$1 $2" in
+clean\ *) echo "$2" >> "$H/cleaned" ;;
 "pkg bad") exit 1 ;;
 pkg\ *) mkdir -p "$H/binpkgs"; sleep 1; touch "$H/binpkgs/$2-1.0_1.x86_64.xbps" ;;
 sleep*) sleep 30 ;;
@@ -40,6 +41,10 @@ VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null 2>&1
 out=$("$R/voidlab" build good bad 2>&1 || true)
 assert_grep "failure is reported" 'build failed: bad' <(echo "$out")
 assert_file "successful build indexed despite later failure" "$R/repo/good-1.0_1.x86_64.xbps"
+
+# Each package's stale builddir is cleaned before building it, so template
+# and patch changes are always applied (xbps-src resumes failed builds).
+assert_grep "builddir cleaned before build" '^good$' "$R/hostdir/cleaned"
 
 # Finding 3: files already indexed (and then pruned) are not copied again
 rm -f "$R/repo/good-1.0_1.x86_64.xbps"
