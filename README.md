@@ -33,8 +33,21 @@ void-packages tree. Builds overlay them onto a stock upstream checkout.
 `build` refuses to run while another xbps-src build is active, and stops
 at the first failure (log in `hostdir/voidlab-build-<pkg>.log`).
 
-This machine installs from the repo via `/etc/xbps.d/20-voidlab.conf`
-(`repository=/home/gui/Projects/voidlab/voidlab/repo`, unsigned local repo).
+This machine installs from the repo via `/etc/xbps.d/20-voidlab.conf`:
+
+```
+repository=/home/gui/Projects/voidlab/voidlab/repo
+bestmatching=true
+```
+
+`bestmatching=true` is required: by default xbps takes a package from the
+*first* repository that has it, and the official repos sort first, so
+overlay builds of packages that also exist upstream would be ignored.
+With it, the highest version across all repos wins — overlay builds win
+only while they are newer. The repo is local and unsigned.
+
+Per-machine xbps-src settings (makejobs, `XBPS_ALLOW_RESTRICTED`, ccache)
+go in `~/.xbps-src.conf`: `.upstream/etc/conf` is wiped on every build.
 
 ### `status` verdicts
 
