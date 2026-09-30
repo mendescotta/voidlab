@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""One-shot seeding of the voidlab overlay from void-packages branches.
+
+For every srcpkgs entry a branch changed relative to --base, keep the
+branch copy with the highest version_revision (xbps-uhelper cmpver; ties
+and unparseable versions go to the newest commit). Entries deleted on
+every branch that changed them are listed in common/removed-srcpkgs.
+See docs/superpowers/specs/2026-09-30-voidlab-overlay-repo-design.md.
+"""
+import argparse
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+def git(src, *args, check=True):
+    r = subprocess.run(["git", "-C", src, *args], capture_output=True, text=True)
+    if check and r.returncode:
+        sys.exit(f"git {' '.join(args)}: {r.stderr.strip()}")
+    return r.stdout
+
+
+def cmpver(a, b):
+    rc = subprocess.run(["xbps-uhelper", "cmpver", a, b]).returncode
+    return {0: 0, 1: 1, 255: -1}[rc]
+
+
+def entry(src, ref, path):
+    """(mode, sha) of a tree entry, or None if absent."""
+    out = git(src, "ls-tree", ref, path).strip()
+    if not out:
+        return None
+    mode, _typ, sha = out.split("\t", 1)[0].split()
+    return mode, sha
+
+
+def template_version(src, ref, pkg):
+    txt = git(src, "show", f"{ref}:srcpkgs/{pkg}/template", check=False)
+    v = re.search(r"^version=(\S+)", txt, re.M)
+    r = re.search(r"^revision=(\d+)", txt, re.M)
+    if not v or not r:
+        return None
+    ver = v.group(1).strip("\"'")
+    return None if "$" in ver else f"{ver}_{r.group(1)}"
+
+
+def last_commit(src, ref, path):
+    out = git(src, "log", "-1", "--format=%ct %h", ref, "--", path).split()
+    return (int(out[0]), out[1]) if out else (0, "")
+
+
+def better(a, b):
+    """True if candidate a beats b. Candidates: dicts with ver, time."""
+    if a["ver"] and b["ver"]:
+        c = cmpver(a["ver"], b["ver"])
+        if c:
+            return c > 0
+    elif a["ver"] or b["ver"]:
+        return bool(a["ver"])
+    return a["time"] > b["time"]
+
+
+def shlib_map(text):
+    m = {}
+    for line in text.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#") and len(s.split()) >= 2:
+            m[s.split()[0]] = s
+    return m
+
+
+def shlib_ver(line):
+    return line.split()[1].rsplit("-", 1)[-1]
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--src", required=True)
+    ap.add_argument("--dest", required=True)
+    ap.add_argument("--base", default="origin/master")
+    ap.add_argument("branches", nargs="+")
+    a = ap.parse_args()
+    src, dest, base = a.src, Path(a.dest), a.base
+
+    changed = {}
+    for br in a.branches:
+        out = git(src, "diff", "--name-only", f"{base}...{br}", "--", "srcpkgs")
+        for p in {line.split("/")[1] for line in out.split()}:
+            changed.setdefault(p, []).append(br)
+
+    (dest / "srcpkgs").mkdir(parents=True, exist_ok=True)
+    rows, removed = [], []
+    for pkg in sorted(changed):
+        path = f"srcpkgs/{pkg}"
+        base_e = entry(src, base, path)
+        cands = []
+        for br in changed[pkg]:
+            e = entry(src, br, path)
+            if e == base_e:
+                continue
+            t, h = last_commit(src, br, path)
+            ver = template_version(src, br, pkg) if e and e[0] != "120000" else None
+            cands.append({"br": br, "e": e, "ver": ver, "time": t, "hash": h})
+        if not cands:
+            continue
+        present = [c for c in cands if c["e"]]
+        if not present:
+            if base_e:
+                removed.append(pkg)
+                rows.append((pkg, "(removed)", cands[0]["br"], cands[0]["hash"], ""))
+            continue
+        win = present[0]
+        for c in present[1:]:
+            if better(c, win):
+                win = c
+        if win["e"][0] == "120000":
+            target = git(src, "show", f"{win['br']}:{path}")
+            (dest / path).symlink_to(target)
+            label = f"-> {target}"
+        else:
+            arc = subprocess.run(["git", "-C", src, "archive", win["br"], path],
+                                 capture_output=True, check=True).stdout
+            subprocess.run(["tar", "-x", "-C", str(dest)], input=arc, check=True)
+            label = win["ver"] or "(unparsed)"
+        others = ", ".join(f"{c['br']}={c['ver'] or '-'}" for c in cands if c is not win)
+        rows.append((pkg, label, win["br"], win["hash"], others))
+
+    common = dest / "common"
+    common.mkdir(exist_ok=True)
+    (common / "removed-srcpkgs").write_text("".join(f"{p}\n" for p in removed))
+
+    base_sh = shlib_map(git(src, "show", f"{base}:common/shlibs"))
+    chosen = {}
+    for br in a.branches:
+        for so, line in shlib_map(git(src, "show", f"{br}:common/shlibs")).items():
+            if base_sh.get(so) == line:
+                continue
+            if so not in chosen or cmpver(shlib_ver(line), shlib_ver(chosen[so])) > 0:
+                chosen[so] = line
+    (common / "shlibs").write_text("".join(f"{chosen[s]}\n" for s in sorted(chosen)))
+
+    patches = {}
+    for br in a.branches:
+        files = git(src, "diff", "--name-only", f"{base}...{br}", "--", "common").split()
+        for f in files:
+            if f == "common/shlibs":
+                continue
+            diff = git(src, "diff", f"{base}...{br}", "--", f)
+            if f in patches and patches[f] != diff:
+                sys.exit(f"{f}: branches disagree; resolve by hand")
+            patches[f] = diff
+    if patches:
+        (common / "patches").mkdir(exist_ok=True)
+    for f, diff in patches.items():
+        name = f.removeprefix("common/").replace("/", "__") + ".patch"
+        (common / "patches" / name).write_text(diff)
+
+    with open(dest / "IMPORT.md", "w") as fh:
+        fh.write("# Import provenance\n\nSeeded from void-packages "
+                 f"(base `{base}`, branches {', '.join(a.branches)}).\n\n"
+                 "| package | version | branch | commit | other candidates |\n"
+                 "|---|---|---|---|---|\n")
+        for r in rows:
+            fh.write("| " + " | ".join(r) + " |\n")
+    print(f"imported {len(rows) - len(removed)} entries, {len(removed)} removals, "
+          f"{len(chosen)} shlibs lines, {len(patches)} common patches")
+
+
+if __name__ == "__main__":
+    main()
