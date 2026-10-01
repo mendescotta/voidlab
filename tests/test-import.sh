@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Builds a fake void-packages repo with an origin/master base and two
-# branches, runs the importer, and checks what it picked.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); . "$HERE/lib.sh"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
@@ -13,22 +11,18 @@ ln -s b srcpkgs/b-old
 printf 'liba.so.1 a-1.0_1\nlibb.so.1 b-1.0_1\n' > common/shlibs
 echo 'X=1' > common/environment/misc.sh
 git add -A; git commit -qm base; git update-ref refs/remotes/origin/master HEAD
-# branch x: a -> 2.0, new c + c-devel symlink, shlibs bump, misc.sh edit, drop b-old
 git checkout -qb x
 tmpl a 2.0 1 > srcpkgs/a/template; mkdir srcpkgs/c; tmpl c 1.0 1 > srcpkgs/c/template
 ln -s c srcpkgs/c-devel; git rm -q srcpkgs/b-old
 printf 'liba.so.2 a-2.0_1\nlibb.so.1 b-1.0_1\n' > common/shlibs
 echo 'X=2' > common/environment/misc.sh
 git add -A; git commit -qm x
-# branch y (from base): a -> 1.5, b touched but reverted to identical, gone deleted,
-# weird has an unparseable version, c exists at 0.9
 git checkout -q master; git checkout -qb y
 tmpl a 1.5 1 > srcpkgs/a/template; git rm -qr srcpkgs/gone
 mkdir srcpkgs/weird; printf 'pkgname=weird\nversion=${_v}\nrevision=1\n' > srcpkgs/weird/template
 mkdir srcpkgs/c; tmpl c 0.9 1 > srcpkgs/c/template
 git add -A; git commit -qm y1; echo '# tmp' >> srcpkgs/b/template; git commit -qam y2
 git checkout -q HEAD~1 -- srcpkgs/b/template; git commit -qam y3
-# branch z: deletes a, which x/y keep -> must not become a removal
 git checkout -q master; git checkout -qb z; git rm -qr srcpkgs/a; git commit -qm z
 git checkout -q master
 

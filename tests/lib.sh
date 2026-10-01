@@ -1,5 +1,4 @@
 # shellcheck shell=bash
-# Tiny assertion helpers shared by the voidlab tests.
 FAILS=0
 ok()   { printf 'ok   %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; FAILS=$((FAILS+1)); }

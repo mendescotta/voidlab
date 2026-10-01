@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Exercises sync/overlay/status against a fake upstream repo (no xbps-src).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); . "$HERE/lib.sh"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
@@ -41,7 +40,7 @@ assert_grep "shlibs: unrelated line kept" '^libz.so.1 z-1.0_1$' "$UP/common/shli
 assert_grep "shlibs: header comment kept" '^# header$' "$UP/common/shlibs"
 assert_grep "common patch applied" 'X=2' "$UP/common/environment/misc.sh"
 
-"$R/voidlab" overlay   # idempotent: second run starts from a clean tree
+"$R/voidlab" overlay
 assert_eq "overlay is idempotent" "$(grep -c '^liba.so.2' "$UP/common/shlibs")" "1"
 
 printf 'pkgname=w\nversion=${_v}\nrevision=1\n' > "$R/srcpkgs/n/template"

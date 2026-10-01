@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# voidlab — build custom xbps-src templates as an overlay on a stock
-# upstream void-packages checkout. See
-# docs/superpowers/specs/2026-09-30-voidlab-overlay-repo-design.md.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
@@ -15,14 +12,11 @@ die()  { echo "voidlab: $*" >&2; exit 1; }
 need() { local t; for t; do command -v "$t" >/dev/null || die "missing tool: $t"; done; }
 need_upstream() { [ -d "$UP/.git" ] || die "no upstream checkout; run: voidlab sync"; }
 xsrc() { (cd "$UP" && ./xbps-src -H "$HOSTDIR" -m "$MASTERDIR" "$@"); }
-# Anything that rewrites .upstream must not run under an active build.
 no_running_build() {
 	need pgrep
 	if pgrep -x xbps-src >/dev/null; then die "another xbps-src build is running"; fi
 }
 
-# version_revision of a template (file path, or - for stdin); fails if
-# version uses a variable or either field is missing.
 tmpl_ver() {
 	awk -F= '/^version=/ { v = $2 } /^revision=/ { r = $2 }
 		END { gsub(/["\047]/, "", v); if (v == "" || r == "" || v ~ /\$/) exit 1; print v "_" r }' "$1"
@@ -33,9 +27,6 @@ merge_shlibs() {
 	[ -s "$ov" ] || return 0
 	dups=$(awk '!/^#/ && NF { print $1 }' "$ov" | sort | uniq -d)
 	[ -z "$dups" ] || die "duplicate SONAME in common/shlibs: $dups"
-	# Drop upstream lines for the same SONAME, and for an older SONAME of
-	# the same library from the same package: xbps-src's pkglint treats a
-	# leftover libfoo.so.N line as an unrecorded SONAME bump.
 	awk 'function key(f, p) { sub(/\.so\..*/, ".so", f); sub(/-[^-]+_[0-9]+$/, "", p); return f " " p }
 		NR == FNR { if (!/^#/ && NF) { ov[$1] = 1; ovlib[key($1, $2)] = 1 }; next }
 		!($1 in ov) && !(NF && key($1, $2) in ovlib)' "$ov" "$up" > "$up.new"
@@ -82,8 +73,6 @@ cmd_sync() {
 	fi
 }
 
-# Copy the packages produced since marker file $1 into repo/ and index it.
-# Only this run's output is copied, so pruned old versions stay pruned.
 index_repo() {
 	local marker=$1 f
 	mkdir -p "$REPO"
@@ -113,8 +102,6 @@ cmd_build() {
 	for p; do
 		log=$HOSTDIR/voidlab-build-$p.log
 		echo "=> $p"
-		# xbps-src resumes a failed build at its last stage, skipping
-		# extract/patch; start clean so template and patch edits apply.
 		xsrc clean "$p" > "$log" 2>&1 || true
 		if ! xsrc pkg "$p" >> "$log" 2>&1; then
 			tail -n 30 "$log" >&2
@@ -128,8 +115,6 @@ cmd_build() {
 cmd_status() {
 	need_upstream
 	need xbps-uhelper xbps-query
-	# Read-only: upstream templates come from HEAD, never the working tree,
-	# which may hold an overlay (or a running build).
 	local pristine
 	pristine=$(mktemp -d)
 	trap 'rm -rf "$pristine"' RETURN
