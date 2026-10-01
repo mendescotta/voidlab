@@ -1,7 +1,7 @@
 # Template file for 'gdm'
 pkgname=gdm
 version=50.3
-revision=1
+revision=2
 build_helper="gir"
 build_style=meson
 configure_args="
@@ -89,6 +89,8 @@ libgdm_package() {
 	short_desc+=" - runtime libraries"
 	pkg_install() {
 		vmove "usr/lib/*.so.*"
+		# gnome-shell reads org.gnome.login-screen even without gdm
+		vmove usr/share/glib-2.0/schemas/org.gnome.login-screen.gschema.xml
 		if [ "$build_option_gir" ]; then
 			vmove usr/lib/girepository-1.0
 		fi
