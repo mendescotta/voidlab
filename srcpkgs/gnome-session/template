@@ -1,7 +1,7 @@
 # Template file for 'gnome-session'
 pkgname=gnome-session
 version=51.0
-revision=8
+revision=9
 build_style=meson
 configure_args="-Dsystemd=false -Dsystemduserunitdir=/usr/lib/systemd/user"
 hostmakedepends="glib-devel gettext pkg-config xmlto"

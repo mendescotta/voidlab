@@ -23,8 +23,10 @@ respawned while the others stop) before stopping the supervisor, and
 only quits once runsvdir has actually exited. Processes still running in
 any runsv's session after that (XDG autostart apps such as pipewire,
 which gnome-session-service spawns and runit never tracks) get SIGTERM,
-then SIGKILL after 3s -- the stand-in for systemd stopping the session's
-app scopes.
+then SIGKILL after 3s from a detached child -- the stand-in for systemd
+stopping the session's app scopes. The private tree's mtime is backdated
+because runsvdir skips a directory modified in the current second, which
+would otherwise delay every session start by one second.
 
 Sessions may restrict which services they run with a profile file,
 LIBEXECDIR/gnome-session/runit-sessions/<session>, listing service names
@@ -39,7 +41,7 @@ required for the leader to function.
 
 --- /dev/null
 +++ b/gnome-session/leader-runit.c
-@@ -0,0 +1,441 @@
+@@ -0,0 +1,463 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
 + *
 + * Copyright (C) 2006 Novell, Inc.
@@ -90,6 +92,7 @@ required for the leader to function.
 +#include <sys/stat.h>
 +#include <sys/types.h>
 +#include <sys/wait.h>
++#include <time.h>
 +#include <unistd.h>
 +
 +#include <glib.h>
@@ -256,10 +259,14 @@ required for the leader to function.
 +        return n;
 +}
 +
++/* SIGTERM now, and SIGKILL whatever is still there after
++ * LEFTOVER_TERM_TIMEOUT_MS from a detached child, so the leader (and with
++ * it the session, and gdm's next greeter) doesn't wait on slow exits. */
 +static void
 +stop_leftover_processes (Leader *ctx)
 +{
 +        gint64 deadline;
++        pid_t child;
 +
 +        if (ctx->service_sids == NULL || ctx->service_sids->len == 0)
 +                return;
@@ -267,13 +274,21 @@ required for the leader to function.
 +                return;
 +        g_debug ("Stopping processes left in session service sessions");
 +
++        child = fork ();
++        if (child != 0) {
++                if (child < 0)
++                        g_debug ("Couldn't fork leftover reaper: %m");
++                return;
++        }
++        setsid ();
 +        deadline = g_get_monotonic_time () + LEFTOVER_TERM_TIMEOUT_MS * 1000;
 +        while (g_get_monotonic_time () < deadline) {
 +                g_usleep (100 * 1000);
 +                if (signal_leftovers (ctx, 0) == 0)
-+                        return;
++                        _exit (0);
 +        }
 +        signal_leftovers (ctx, SIGKILL);
++        _exit (0);
 +}
 +
 +static void
@@ -409,6 +424,15 @@ required for the leader to function.
 +                while (g_hash_table_iter_next (&iter, (gpointer *) &missing, NULL))
 +                        g_warning ("Session %s lists unknown runit service %s", session_name, missing);
 +        }
++
++        /* runsvdir won't scan a directory modified in the current second
++         * (it re-checks a second later), which would delay every session
++         * start by a full second; backdate the freshly built tree. */
++        struct timespec past[2] = {
++                { .tv_sec = time (NULL) - 2 }, { .tv_sec = time (NULL) - 2 }
++        };
++        if (utimensat (AT_FDCWD, service_dir, past, 0) < 0)
++                g_debug ("Couldn't backdate %s: %m", service_dir);
 +
 +        return service_dir;
 +}
