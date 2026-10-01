@@ -20,7 +20,11 @@ per service, with run symlinked to the shipped script) and runs
 runsvdir -P on that. On SIGTERM/SIGINT it asks runsv to bring each
 service down (one `sv -w5 down` call covering every service, so none is
 respawned while the others stop) before stopping the supervisor, and
-only quits once runsvdir has actually exited.
+only quits once runsvdir has actually exited. Processes still running in
+any runsv's session after that (XDG autostart apps such as pipewire,
+which gnome-session-service spawns and runit never tracks) get SIGTERM,
+then SIGKILL after 3s -- the stand-in for systemd stopping the session's
+app scopes.
 
 Sessions may restrict which services they run with a profile file,
 LIBEXECDIR/gnome-session/runit-sessions/<session>, listing service names
@@ -35,7 +39,7 @@ required for the leader to function.
 
 --- /dev/null
 +++ b/gnome-session/leader-runit.c
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,441 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
 + *
 + * Copyright (C) 2006 Novell, Inc.
@@ -80,6 +84,7 @@ required for the leader to function.
 +#include <errno.h>
 +#include <fcntl.h>
 +#include <signal.h>
++#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
 +#include <sys/stat.h>
@@ -100,6 +105,7 @@ required for the leader to function.
 + * drop-in). Sessions without a profile run every shipped service. */
 +#define RUNIT_SESSIONS_DIR (LIBEXECDIR "/gnome-session/runit-sessions")
 +#define SV_DOWN_TIMEOUT_SECS "5"
++#define LEFTOVER_TERM_TIMEOUT_MS 3000
 +
 +typedef struct {
 +        GMainLoop *loop;
@@ -107,6 +113,7 @@ required for the leader to function.
 +        char      *service_dir;
 +        int        fifo_fd;
 +        gboolean   tearing_down;
++        GArray    *service_sids;
 +} Leader;
 +
 +static void
@@ -114,6 +121,7 @@ required for the leader to function.
 +{
 +        g_clear_pointer (&ctx->loop, g_main_loop_unref);
 +        g_clear_pointer (&ctx->service_dir, g_free);
++        g_clear_pointer (&ctx->service_sids, g_array_unref);
 +        if (ctx->fifo_fd >= 0)
 +                g_close (ctx->fifo_fd, NULL);
 +}
@@ -165,6 +173,109 @@ required for the leader to function.
 +                g_debug ("Couldn't run `sv down`: %s", error->message);
 +}
 +
++/* Parent pid of `pid` from /proc/<pid>/stat, or -1. */
++static pid_t
++proc_ppid (pid_t pid)
++{
++        g_autofree char *path = g_strdup_printf ("/proc/%d/stat", (int) pid);
++        g_autofree char *stat = NULL;
++        const char *p;
++        int ppid;
++
++        if (!g_file_get_contents (path, &stat, NULL, NULL))
++                return -1;
++        p = strrchr (stat, ')');
++        if (p == NULL || sscanf (p + 1, " %*c %d", &ppid) != 1)
++                return -1;
++        return ppid;
++}
++
++static GArray *
++list_pids (void)
++{
++        g_autoptr (GDir) dir = g_dir_open ("/proc", 0, NULL);
++        GArray *pids = g_array_new (FALSE, FALSE, sizeof (pid_t));
++        const char *name;
++
++        if (dir == NULL)
++                return pids;
++        while ((name = g_dir_read_name (dir))) {
++                char *end;
++                long pid = strtol (name, &end, 10);
++
++                if (*end == '\0' && pid > 1) {
++                        pid_t p = pid;
++                        g_array_append_val (pids, p);
++                }
++        }
++        return pids;
++}
++
++/* runsvdir starts every runsv as its own session leader, and a service's
++ * processes -- plus anything they spawn, such as XDG autostart apps
++ * launched by gnome-session-service -- stay in that session. Remember
++ * those sessions so whatever outlives runsv can be stopped afterwards,
++ * the way systemd stops a session's app scopes. */
++static void
++collect_service_sids (Leader *ctx)
++{
++        g_autoptr (GArray) pids = list_pids ();
++
++        ctx->service_sids = g_array_new (FALSE, FALSE, sizeof (pid_t));
++        for (guint i = 0; i < pids->len; i++) {
++                pid_t pid = g_array_index (pids, pid_t, i);
++
++                if (proc_ppid (pid) == ctx->runsvdir_pid && getsid (pid) == pid)
++                        g_array_append_val (ctx->service_sids, pid);
++        }
++}
++
++static gboolean
++in_service_session (Leader *ctx, pid_t pid)
++{
++        pid_t sid = getsid (pid);
++
++        for (guint i = 0; sid > 0 && i < ctx->service_sids->len; i++)
++                if (g_array_index (ctx->service_sids, pid_t, i) == sid)
++                        return TRUE;
++        return FALSE;
++}
++
++static guint
++signal_leftovers (Leader *ctx, int sig)
++{
++        g_autoptr (GArray) pids = list_pids ();
++        guint n = 0;
++
++        for (guint i = 0; i < pids->len; i++) {
++                pid_t pid = g_array_index (pids, pid_t, i);
++
++                if (in_service_session (ctx, pid) && kill (pid, sig) == 0)
++                        n++;
++        }
++        return n;
++}
++
++static void
++stop_leftover_processes (Leader *ctx)
++{
++        gint64 deadline;
++
++        if (ctx->service_sids == NULL || ctx->service_sids->len == 0)
++                return;
++        if (signal_leftovers (ctx, SIGTERM) == 0)
++                return;
++        g_debug ("Stopping processes left in session service sessions");
++
++        deadline = g_get_monotonic_time () + LEFTOVER_TERM_TIMEOUT_MS * 1000;
++        while (g_get_monotonic_time () < deadline) {
++                g_usleep (100 * 1000);
++                if (signal_leftovers (ctx, 0) == 0)
++                        return;
++        }
++        signal_leftovers (ctx, SIGKILL);
++}
++
 +static void
 +teardown_session (Leader *ctx)
 +{
@@ -173,6 +284,7 @@ required for the leader to function.
 +        ctx->tearing_down = TRUE;
 +
 +        g_debug ("Tearing down session services");
++        collect_service_sids (ctx);
 +        stop_all_services (ctx);
 +
 +        /* runsvdir exits immediately on TERM, orphaning every runsv; HUP
@@ -202,6 +314,7 @@ required for the leader to function.
 +        g_debug ("runsvdir (pid %d) exited, ending session", (int) pid);
 +        g_spawn_close_pid (pid);
 +        ctx->runsvdir_pid = 0;
++        stop_leftover_processes (ctx);
 +        g_main_loop_quit (ctx->loop);
 +}
 +
