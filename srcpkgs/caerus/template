@@ -3,8 +3,10 @@
 # To use: copy or symlink this directory to <void-packages checkout>/srcpkgs/caerus,
 # then from inside that checkout: ./xbps-src pkg caerus
 pkgname=caerus
-version=0.5.0
+version=0.6.0.20261001
 revision=1
+_commit=2b4c6ea3414241de4784a11bb27fb43bcd7d3dfa
+wrksrc="Caerus-${_commit}"
 build_style=cargo
 hostmakedepends="pkg-config clang"
 makedepends="gtk4-devel libxbps-devel glib-devel"
@@ -13,8 +15,8 @@ short_desc="Synaptic-inspired GTK4 package manager for Void Linux, built on libx
 maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/Caerus"
-distfiles="https://github.com/mendescotta/Caerus/archive/refs/tags/v${version}.tar.gz"
-checksum=6a527f8c2e62763d58991e38191b584ead6eadf93a43bdb0373eaa63f08040a8
+distfiles="https://github.com/mendescotta/Caerus/archive/${_commit}.tar.gz"
+checksum=7a379628ccf8a54f063827eb8b7d99ba3c2f28d432e011e2d87de6b81349fda5
 
 do_install() {
 	vbin target/${RUST_TARGET}/release/caerus
