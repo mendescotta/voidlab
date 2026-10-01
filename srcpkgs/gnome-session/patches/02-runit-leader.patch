@@ -18,8 +18,9 @@ supervise/ directory next to each run script, so each session builds a
 private tree under $XDG_RUNTIME_DIR/gnome-session/runit (one directory
 per service, with run symlinked to the shipped script) and runs
 runsvdir -P on that. On SIGTERM/SIGINT it asks runsv to bring each
-service down (`sv -w5 down`) before stopping the supervisor, and only
-quits once runsvdir has actually exited.
+service down (one `sv -w5 down` call covering every service, so none is
+respawned while the others stop) before stopping the supervisor, and
+only quits once runsvdir has actually exited.
 
 Sessions may restrict which services they run with a profile file,
 LIBEXECDIR/gnome-session/runit-sessions/<session>, listing service names
@@ -34,7 +35,7 @@ required for the leader to function.
 
 --- /dev/null
 +++ b/gnome-session/leader-runit.c
-@@ -0,0 +1,324 @@
+@@ -0,0 +1,332 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
 + *
 + * Copyright (C) 2006 Novell, Inc.
@@ -128,32 +129,40 @@ required for the leader to function.
 +        setsid ();
 +}
 +
-+/* Ask runsv to take each service down (waiting up to SV_DOWN_TIMEOUT_SECS
-+ * per service) before tearing down the supervisor itself. Best-effort: a
-+ * service directory that isn't running yet or has no runsv controlling it
-+ * is simply skipped by `sv`. */
++/* Ask runsv to take every service down, waiting up to
++ * SV_DOWN_TIMEOUT_SECS in total, before tearing down the supervisor
++ * itself. A single `sv` call sends each runsv its down command before
++ * waiting on any of them: going one service at a time lets runsv respawn
++ * the ones that already exited because the session bus went away (a gdm
++ * greeter's gnome-shell then grabs the GPU again mid-handover), and makes
++ * logout wait on each service in turn. Best-effort: a service directory
++ * that isn't running yet or has no runsv controlling it is skipped by `sv`. */
 +static void
 +stop_all_services (Leader *ctx)
 +{
 +        g_autoptr (GDir) dir = NULL;
++        g_autoptr (GPtrArray) argv = NULL;
++        g_autoptr (GError) error = NULL;
 +        const char *name;
 +
 +        dir = g_dir_open (ctx->service_dir, 0, NULL);
 +        if (dir == NULL)
 +                return;
 +
-+        while ((name = g_dir_read_name (dir))) {
-+                g_autofree char *service_path = NULL;
-+                g_autoptr (GError) error = NULL;
-+                gchar *argv[] = { "sv", "-w", SV_DOWN_TIMEOUT_SECS, "down", NULL, NULL };
++        argv = g_ptr_array_new_with_free_func (g_free);
++        g_ptr_array_add (argv, g_strdup ("sv"));
++        g_ptr_array_add (argv, g_strdup ("-w"));
++        g_ptr_array_add (argv, g_strdup (SV_DOWN_TIMEOUT_SECS));
++        g_ptr_array_add (argv, g_strdup ("down"));
++        while ((name = g_dir_read_name (dir)))
++                g_ptr_array_add (argv, g_build_filename (ctx->service_dir, name, NULL));
++        if (argv->len == 4)
++                return;
++        g_ptr_array_add (argv, NULL);
 +
-+                service_path = g_build_filename (ctx->service_dir, name, NULL);
-+                argv[4] = service_path;
-+
-+                if (!g_spawn_sync (NULL, argv, NULL, G_SPAWN_SEARCH_PATH,
-+                                   NULL, NULL, NULL, NULL, NULL, &error))
-+                        g_debug ("Couldn't run `sv down` for %s: %s", name, error->message);
-+        }
++        if (!g_spawn_sync (NULL, (gchar **) argv->pdata, NULL, G_SPAWN_SEARCH_PATH,
++                           NULL, NULL, NULL, NULL, NULL, &error))
++                g_debug ("Couldn't run `sv down`: %s", error->message);
 +}
 +
 +static void
