@@ -1,0 +1,31 @@
+Pass the greeter environment to the session directly again.
+
+Since dec7056f8 (gdm 50) the greeter environment (DCONF_PROFILE,
+XDG_CONFIG_HOME, XDG_STATE_HOME, XDG_DATA_DIRS, ...) is only written to
+~/.config/environment.d/gdm.conf for systemd --user to pick up. On
+runit + elogind nothing reads that file, so the greeter started without
+it. Set the variables on the session as before; keep the file.
+
+diff --git a/daemon/gdm-launch-environment.c b/daemon/gdm-launch-environment.c
+index 110520c0b..ea32b8374 100644
+--- a/daemon/gdm-launch-environment.c
++++ b/daemon/gdm-launch-environment.c
+@@ -428,9 +428,17 @@ on_session_setup_complete (GdmSession        *session,
+         gpointer          key, value;
+ 
+         hash = build_launch_environment (launch_environment, TRUE);
++
++        /* Without systemd --user nothing reads environment.d, so also pass
++         * the greeter environment to the session directly, as before
++         * dec7056f8 ("Let systemd pickup greeter environment variables"). */
++        g_hash_table_iter_init (&iter, hash);
++        while (g_hash_table_iter_next (&iter, &key, &value))
++                gdm_session_set_environment_variable (launch_environment->session, key, value);
++
+         env_output_stream = get_environment_file_output_stream (launch_environment, &error);
+         if (!env_output_stream) {
+-                g_critical ("Failed to set up environment file: %s", error->message);
++                g_warning ("Failed to set up environment file: %s", error->message);
+                 return;
+         }
+ 

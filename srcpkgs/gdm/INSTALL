@@ -44,6 +44,19 @@ post)
 	chmod 1770 var/log/gdm
 	chown gdm:gdm var/log/gdm
 
+	# Preallocated greeter account (see template). Home matches the one
+	# gdm creates for it under GDM_DYN_HOME_DIR.
+	if ! getent group gdm-greeter >/dev/null; then
+		groupadd -r gdm-greeter
+	fi
+	# gdm-launch-environment's PAM stack requires "user ingroup gdm".
+	if ! getent passwd gdm-greeter >/dev/null; then
+		useradd -r -g gdm-greeter -G gdm,video -d /run/gdm/home/gdm-greeter \
+			-s /bin/false -c "gdm greeter" gdm-greeter
+	else
+		usermod -a -G gdm,video gdm-greeter
+	fi
+
 	dconf update
 	;;
 esac

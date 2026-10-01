@@ -1,7 +1,7 @@
 # Template file for 'gdm'
 pkgname=gdm
-version=50.3
-revision=2
+version=51.0
+revision=1
 build_helper="gir"
 build_style=meson
 configure_args="
@@ -12,7 +12,7 @@ configure_args="
  -Ddefault-path=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin
  -Dsystemdsystemunitdir=/usr/lib/systemd/system
  -Dsystemduserunitdir=/usr/lib/systemd/user
- -Dlogind-provider=elogind"
+ -Dlogind-provider=elogind -Dpam-services-dir=/etc/pam.d"
 hostmakedepends="dconf gettext itstool pkg-config"
 makedepends="accountsservice-devel elogind-devel gettext-devel glib-devel
  iso-codes libSM-devel libcanberra-devel nss-devel pam-devel upower-devel
@@ -28,7 +28,7 @@ homepage="https://wiki.gnome.org/Projects/GDM"
 #changelog="https://gitlab.gnome.org/GNOME/gdm/-/raw/gnome-48/NEWS"
 changelog="https://gitlab.gnome.org/GNOME/gdm/-/raw/main/NEWS"
 distfiles="${GNOME_SITE}/gdm/${version%%.*}/gdm-${version}.tar.xz"
-checksum=adac0710b8b797108ea40ea4573bd1a5e6d9b24e0a7990a994216e8dffe2d15e
+checksum=2ce5acf5a438b8f6dc1d14fd777a911be5eeb2f7ab9a7c4600166205b15d6536
 
 conf_files="
 	/etc/gdm/custom.conf
@@ -42,19 +42,12 @@ make_dirs="
 	/usr/share/gdm/env.d 0755 root root
 	/etc/gdm/env.d 0755 root root"
 # Create the 'gdm' system user/group.
-# 'gdmgreeter' is the preallocated fallback account GDM's dynamic user
-# store uses for the greeter session on systems without systemd-userdbd
-# (e.g. elogind); without it gdm segfaults in libpcre2 (missing dconf
-# profile below) and then fails with "not preallocated and system lacks
-# userdb", crash-looping.
-# NOTE: xbps-src's system_accounts custom-var mechanism (${_uname}_homedir
-# etc.) generates `export ${_uname}_homedir=...` and evals it as a bash
-# identifier, so the account name here can't contain a dash -- "gdm-greeter"
-# made the generated INSTALL script fail at runtime with "bad variable name".
-system_accounts="gdm gdmgreeter"
+# The greeter runs as 'gdm-greeter': gdm 49+ allocates it through systemd
+# userdb, and without userdb (elogind) falls back to a preallocated account
+# of that exact name. xbps-src's system_accounts can't create names with a
+# dash (they become shell variable names), so INSTALL creates it.
+system_accounts="gdm"
 gdm_homedir="/var/lib/gdm"
-gdmgreeter_homedir="/var/lib/gdm/greeter"
-gdmgreeter_descr="gdm greeter unprivileged user"
 
 # Package build options
 build_options="gir"
@@ -65,8 +58,12 @@ if [ "$CROSS_BUILD" ]; then
 fi
 
 post_install() {
+	# Upstream lists both modules (each "-" optional); converting the
+	# pam_systemd line would register the elogind session twice.
 	for f in $DESTDIR/etc/pam.d/*; do
-		if grep -q "pam_systemd.so" "$f"; then
+		if grep -q "pam_elogind.so" "$f"; then
+			vsed -i "/pam_systemd\.so/d" "$f"
+		elif grep -q "pam_systemd.so" "$f"; then
 			vsed -i "s/pam_systemd\.so/pam_elogind.so/" "$f"
 		fi
 	done
