@@ -1,0 +1,22 @@
+# Template file for 'gthumb'
+pkgname=gthumb
+version=4.0
+revision=1
+build_style=meson
+configure_args="-Dtarball-appdata=true"
+hostmakedepends="gettext pkg-config itstool glib-devel desktop-file-utils
+ gtk-update-icon-cache vala"
+makedepends="gtk4-devel libadwaita-devel libportal-devel libportal-gtk4-devel
+ exiv2-devel lcms2-devel libpng-devel libjpeg-turbo-devel colord-devel
+ libwebp-devel librsvg-devel libheif-devel libjxl-devel tiff-devel
+ giflib-devel libraw-devel gstreamer1-devel gst-plugins-base1-devel"
+short_desc="Image viewer and browser for the GNOME Desktop"
+maintainer="Akash <git@mondal.zip>"
+license="GPL-2.0-or-later"
+homepage="https://gitlab.gnome.org/GNOME/gthumb"
+changelog="https://gitlab.gnome.org/GNOME/gthumb/-/raw/master/NEWS"
+distfiles="${GNOME_SITE}/gthumb/${version}/gthumb-${version}.tar.xz"
+checksum=a24aaa72b5637f49097dedc9c141a33615da770d029315f3285ebf2156cf7b61
+
+# Upstream relies on gcc 15's C23 default (bool without <stdbool.h>).
+CFLAGS="-std=gnu23"
