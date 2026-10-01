@@ -1,7 +1,7 @@
 # Template file for 'gnome-session'
 pkgname=gnome-session
 version=51.0
-revision=3
+revision=5
 build_style=meson
 configure_args="-Dsystemd=false -Dsystemduserunitdir=/usr/lib/systemd/user"
 hostmakedepends="glib-devel gettext pkg-config xmlto"
@@ -38,6 +38,9 @@ post_install() {
 		vinstall ${FILESDIR}/runit-services/${svc}/run 755 \
 			usr/libexec/gnome-session/runit-services/${svc}
 	done
+	# Ends the session on logout; see the script.
+	vinstall ${FILESDIR}/runit-services/gnome-session-service/finish 755 \
+		usr/libexec/gnome-session/runit-services/gnome-session-service
 
 	# gnome-settings-daemon components: gsm-manager.c (gnome-session-service)
 	# no longer spawns these on its own -- see 02-runit-leader.patch's commit

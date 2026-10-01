@@ -26,32 +26,9 @@ compatibility (matches leader-systemd.c/leader-openrc.c) even though
 nothing in this package currently reads the far end -- best-effort, not
 required for the leader to function.
 
---- a/gnome-session/meson.build
-+++ b/gnome-session/meson.build
-@@ -19,14 +19,18 @@
-   install_dir: session_bindir
- )
- 
--# If you are not using systemd, you must supply your own init-worker
-+# If you are not using systemd, we supply our own init-worker that
-+# supervises the session under runit instead of systemd --user.
- if get_option('systemd')
-   sources = files(
-       'gsm-util.c',
-       'leader-systemd.c',
-   )
- else
--  sources = disabler()
-+  sources = files(
-+      'gsm-util.c',
-+      'leader-runit.c',
-+  )
- endif
- 
- executable(
 --- /dev/null
 +++ b/gnome-session/leader-runit.c
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,276 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
 + *
 + * Copyright (C) 2006 Novell, Inc.
@@ -178,7 +155,9 @@ required for the leader to function.
 +        g_debug ("Tearing down session services");
 +        stop_all_services (ctx);
 +
-+        kill (ctx->runsvdir_pid, SIGTERM);
++        /* runsvdir exits immediately on TERM, orphaning every runsv; HUP
++         * makes it TERM each runsv (and so each service) before exiting. */
++        kill (ctx->runsvdir_pid, SIGHUP);
 +}
 +
 +static gboolean
@@ -207,9 +186,10 @@ required for the leader to function.
 +}
 +
 +/* Build this session's private runit tree: one directory per shipped
-+ * service, each holding a symlink to the shipped run script, so runsv can
-+ * create its supervise/ state in a location the user can write to. Any
-+ * tree left behind by a previous session is removed first. */
++ * service, each holding symlinks to the shipped run (and, if present,
++ * finish) scripts, so runsv can create its supervise/ state in a location
++ * the user can write to. Any tree left behind by a previous session is
++ * removed first. */
 +static char *
 +setup_service_dir (void)
 +{
@@ -244,6 +224,14 @@ required for the leader to function.
 +                        continue;
 +                if (g_mkdir (svc, 0700) < 0 || symlink (target, link) < 0)
 +                        g_error ("Failed to set up runit service %s: %m", name);
++
++                g_free (target);
++                g_free (link);
++                target = g_build_filename (RUNIT_TEMPLATE_DIR, name, "finish", NULL);
++                link = g_build_filename (svc, "finish", NULL);
++                if (g_file_test (target, G_FILE_TEST_IS_EXECUTABLE) &&
++                    symlink (target, link) < 0)
++                        g_error ("Failed to set up runit finish script for %s: %m", name);
 +        }
 +
 +        return service_dir;
@@ -276,6 +264,12 @@ required for the leader to function.
 +        /* Session's own run scripts read this to know which components
 +         * to launch (e.g. which gnome-session-service --session=). */
 +        g_setenv ("GNOME_SESSION_NAME", session_name, TRUE);
++
++        /* gnome-session-service's finish script SIGTERMs us when the
++         * service exits cleanly (logout), standing in for systemd tearing
++         * down gnome-session.target when gnome-session-manager@ stops. */
++        g_autofree char *leader_pid = g_strdup_printf ("%d", (int) getpid ());
++        g_setenv ("GNOME_SESSION_LEADER_PID", leader_pid, TRUE);
 +
 +        ctx.loop = g_main_loop_new (NULL, TRUE);
 +
@@ -311,3 +305,26 @@ required for the leader to function.
 +        g_main_loop_run (ctx.loop);
 +        return 0;
 +}
+--- a/gnome-session/meson.build
++++ b/gnome-session/meson.build
+@@ -19,14 +19,18 @@ executable(
+   install_dir: session_bindir
+ )
+ 
+-# If you are not using systemd, you must supply your own init-worker
++# If you are not using systemd, we supply our own init-worker that
++# supervises the session under runit instead of systemd --user.
+ if get_option('systemd')
+   sources = files(
+       'gsm-util.c',
+       'leader-systemd.c',
+   )
+ else
+-  sources = disabler()
++  sources = files(
++      'gsm-util.c',
++      'leader-runit.c',
++  )
+ endif
+ 
+ executable(

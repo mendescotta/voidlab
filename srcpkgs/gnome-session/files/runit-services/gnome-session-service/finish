@@ -1,0 +1,11 @@
+#!/bin/sh
+# runsv runs this with $1 = exit code (-1 if killed by a signal) and
+# $2 = signal/wait status. gnome-session-service returns 0 only after an
+# EndSession (logout, or after asking logind to reboot/power off). Under
+# systemd its unit stopping takes gnome-session.target and the leader down
+# with it; here, keep runsv from restarting it and ask the leader to tear
+# the session down. Crashes (non-zero/-1) fall through and runsv restarts.
+[ "$1" = 0 ] || exit 0
+sv down . 2>/dev/null
+[ -n "$GNOME_SESSION_LEADER_PID" ] && kill -TERM "$GNOME_SESSION_LEADER_PID"
+exit 0
