@@ -8,7 +8,7 @@ git init -q -b master; git config user.email t@t; git config user.name t
 mkdir -p srcpkgs/a srcpkgs/b srcpkgs/c common/environment
 tmpl a 1.0 1 > srcpkgs/a/template; tmpl b 3.0 1 > srcpkgs/b/template
 tmpl c 1.0 1 > srcpkgs/c/template; ln -s c srcpkgs/c-old; ln -s a srcpkgs/lnk
-printf '# header\nliba.so.1 a-1.0_1\nlibz.so.1 z-1.0_1\n' > common/shlibs
+printf '# header\nliba.so.0 a-compat-0.9_1\nliba.so.1 a-1.0_1\nlibz.so.1 z-1.0_1\n' > common/shlibs
 echo 'X=1' > common/environment/misc.sh
 git add -A; git commit -qm up
 
@@ -35,6 +35,8 @@ assert_eq  "overlay copies symlink n-devel" "$(readlink "$UP/srcpkgs/n-devel")" 
 assert_eq  "dir over upstream symlink lnk" "$([ -d "$UP/srcpkgs/lnk" ] && [ ! -L "$UP/srcpkgs/lnk" ] && echo dir)" "dir"
 assert_no  "removed-srcpkgs deletes c-old" "$UP/srcpkgs/c-old"
 assert_grep "shlibs: new soname appended" '^liba.so.2 a-2.0_1$' "$UP/common/shlibs"
+assert_eq  "shlibs: bumped soname drops old line" "$(grep -c '^liba.so.1 ' "$UP/common/shlibs")" "0"
+assert_grep "shlibs: same lib from other pkg kept" '^liba.so.0 a-compat-0.9_1$' "$UP/common/shlibs"
 assert_grep "shlibs: unrelated line kept" '^libz.so.1 z-1.0_1$' "$UP/common/shlibs"
 assert_grep "shlibs: header comment kept" '^# header$' "$UP/common/shlibs"
 assert_grep "common patch applied" 'X=2' "$UP/common/environment/misc.sh"

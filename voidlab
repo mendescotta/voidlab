@@ -33,7 +33,12 @@ merge_shlibs() {
 	[ -s "$ov" ] || return 0
 	dups=$(awk '!/^#/ && NF { print $1 }' "$ov" | sort | uniq -d)
 	[ -z "$dups" ] || die "duplicate SONAME in common/shlibs: $dups"
-	awk 'NR == FNR { if (!/^#/ && NF) ov[$1] = 1; next } !($1 in ov)' "$ov" "$up" > "$up.new"
+	# Drop upstream lines for the same SONAME, and for an older SONAME of
+	# the same library from the same package: xbps-src's pkglint treats a
+	# leftover libfoo.so.N line as an unrecorded SONAME bump.
+	awk 'function key(f, p) { sub(/\.so\..*/, ".so", f); sub(/-[^-]+_[0-9]+$/, "", p); return f " " p }
+		NR == FNR { if (!/^#/ && NF) { ov[$1] = 1; ovlib[key($1, $2)] = 1 }; next }
+		!($1 in ov) && !(NF && key($1, $2) in ovlib)' "$ov" "$up" > "$up.new"
 	awk '!/^#/ && NF' "$ov" >> "$up.new"
 	mv "$up.new" "$up"
 }
