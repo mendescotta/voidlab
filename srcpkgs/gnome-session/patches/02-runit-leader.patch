@@ -21,6 +21,12 @@ runsvdir -P on that. On SIGTERM/SIGINT it asks runsv to bring each
 service down (`sv -w5 down`) before stopping the supervisor, and only
 quits once runsvdir has actually exited.
 
+Sessions may restrict which services they run with a profile file,
+LIBEXECDIR/gnome-session/runit-sessions/<session>, listing service names
+one per line -- the stand-in for per-session systemd targets such as gdm's
+gnome-session@gnome-login.target drop-in. Sessions without a profile run
+every shipped service.
+
 The gnome-session-leader-fifo write on shutdown is kept for protocol
 compatibility (matches leader-systemd.c/leader-openrc.c) even though
 nothing in this package currently reads the far end -- best-effort, not
@@ -28,7 +34,7 @@ required for the leader to function.
 
 --- /dev/null
 +++ b/gnome-session/leader-runit.c
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,324 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
 + *
 + * Copyright (C) 2006 Novell, Inc.
@@ -87,6 +93,11 @@ required for the leader to function.
 +#include "gsm-util.h"
 +
 +#define RUNIT_TEMPLATE_DIR (LIBEXECDIR "/gnome-session/runit-services")
++/* Optional per-session profiles: RUNIT_SESSIONS_DIR/<session> lists the
++ * services (one per line) that session runs, standing in for the
++ * per-session systemd targets (e.g. gdm's gnome-session@gnome-login.target
++ * drop-in). Sessions without a profile run every shipped service. */
++#define RUNIT_SESSIONS_DIR (LIBEXECDIR "/gnome-session/runit-sessions")
 +#define SV_DOWN_TIMEOUT_SECS "5"
 +
 +typedef struct {
@@ -190,9 +201,39 @@ required for the leader to function.
 + * finish) scripts, so runsv can create its supervise/ state in a location
 + * the user can write to. Any tree left behind by a previous session is
 + * removed first. */
-+static char *
-+setup_service_dir (void)
++static GHashTable *
++load_session_profile (const char *session_name)
 +{
++        g_autofree char *path = NULL;
++        g_autofree char *contents = NULL;
++        g_auto (GStrv) lines = NULL;
++        g_autoptr (GError) error = NULL;
++        GHashTable *services;
++
++        path = g_build_filename (RUNIT_SESSIONS_DIR, session_name, NULL);
++        if (!g_file_get_contents (path, &contents, NULL, &error)) {
++                if (!g_error_matches (error, G_FILE_ERROR, G_FILE_ERROR_NOENT))
++                        g_warning ("Failed to read session profile %s: %s", path, error->message);
++                return NULL;
++        }
++
++        services = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
++        lines = g_strsplit (contents, "\n", -1);
++        for (char **l = lines; *l; l++) {
++                char *name = g_strstrip (*l);
++
++                if (*name == '\0' || *name == '#')
++                        continue;
++                g_hash_table_add (services, g_strdup (name));
++        }
++
++        return services;
++}
++
++static char *
++setup_service_dir (const char *session_name)
++{
++        g_autoptr (GHashTable) profile = NULL;
 +        g_autoptr (GDir) dir = NULL;
 +        g_autoptr (GError) error = NULL;
 +        g_autofree char *parent = NULL;
@@ -211,6 +252,8 @@ required for the leader to function.
 +        if (g_mkdir_with_parents (service_dir, 0700) < 0)
 +                g_error ("Failed to create runit tree %s: %m", service_dir);
 +
++        profile = load_session_profile (session_name);
++
 +        dir = g_dir_open (RUNIT_TEMPLATE_DIR, 0, &error);
 +        if (dir == NULL)
 +                g_error ("Runit service directory %s is missing: %s", RUNIT_TEMPLATE_DIR, error->message);
@@ -220,6 +263,8 @@ required for the leader to function.
 +                g_autofree char *target = g_build_filename (RUNIT_TEMPLATE_DIR, name, "run", NULL);
 +                g_autofree char *link = g_build_filename (svc, "run", NULL);
 +
++                if (profile != NULL && !g_hash_table_remove (profile, name))
++                        continue;
 +                if (!g_file_test (target, G_FILE_TEST_IS_EXECUTABLE))
 +                        continue;
 +                if (g_mkdir (svc, 0700) < 0 || symlink (target, link) < 0)
@@ -232,6 +277,15 @@ required for the leader to function.
 +                if (g_file_test (target, G_FILE_TEST_IS_EXECUTABLE) &&
 +                    symlink (target, link) < 0)
 +                        g_error ("Failed to set up runit finish script for %s: %m", name);
++        }
++
++        if (profile != NULL) {
++                GHashTableIter iter;
++                const char *missing;
++
++                g_hash_table_iter_init (&iter, profile);
++                while (g_hash_table_iter_next (&iter, (gpointer *) &missing, NULL))
++                        g_warning ("Session %s lists unknown runit service %s", session_name, missing);
 +        }
 +
 +        return service_dir;
@@ -285,7 +339,7 @@ required for the leader to function.
 +        else if (fstat (ctx.fifo_fd, &statbuf) == 0 && !(statbuf.st_mode & S_IFIFO))
 +                g_warning ("Leader FIFO path is not a FIFO, ignoring it");
 +
-+        ctx.service_dir = setup_service_dir ();
++        ctx.service_dir = setup_service_dir (session_name);
 +        runsvdir_argv[2] = ctx.service_dir;
 +
 +        if (!g_spawn_async (NULL, runsvdir_argv, NULL,

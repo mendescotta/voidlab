@@ -1,6 +1,12 @@
 #!/bin/sh
 # Started by leader-runit.c under runsvdir -P. Systemd builds start this
-# as org.gnome.Shell@user.service, unit-activated from gnome.session.conf;
-# there is no unit activation here, so the leader runs it directly.
+# as org.gnome.Shell@<mode>.service (gnome.session.conf / gdm's
+# gnome-session@gnome-login.target drop-in pick the instance); there is no
+# unit activation here, so map the session name to the same mode.
 exec 2>&1
-exec /usr/bin/gnome-shell
+case "$GNOME_SESSION_NAME" in
+gnome-login) mode=gdm ;;
+gnome-initial-setup) mode=initial-setup ;;
+*) mode=user ;;
+esac
+exec /usr/bin/gnome-shell --mode="$mode"

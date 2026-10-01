@@ -1,0 +1,13 @@
+# gdm greeter session: gdm's gnome-session@gnome-login.target drop-in
+# requires gnome-session-basic-services.target + org.gnome.Shell@gdm.
+gnome-session-service
+gnome-session-initialized
+gnome-shell
+gsd-a11y-settings
+gsd-keyboard
+gsd-media-keys
+gsd-power
+gsd-rfkill
+gsd-sharing
+gsd-smartcard
+gsd-usb-protection
