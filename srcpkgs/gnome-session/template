@@ -1,7 +1,7 @@
 # Template file for 'gnome-session'
 pkgname=gnome-session
 version=51.0
-revision=9
+revision=10
 build_style=meson
 configure_args="-Dsystemd=false -Dsystemduserunitdir=/usr/lib/systemd/user"
 hostmakedepends="glib-devel gettext pkg-config xmlto"
@@ -27,7 +27,7 @@ post_install() {
 	local svc gsd_plugin
 	local gsd_plugins="a11y-settings color datetime housekeeping keyboard
 	 media-keys power print-notifications rfkill screensaver-proxy
-	 sharing smartcard sound usb-protection wwan"
+	 smartcard sound usb-protection wwan"
 
 	vmkdir usr/libexec/gnome-session/runit-services
 	# gsd-xsettings is an X11 client and has its own run script that waits
@@ -50,7 +50,8 @@ post_install() {
 	# gnome-settings-daemon components: gsm-manager.c (gnome-session-service)
 	# no longer spawns these on its own -- see 02-runit-leader.patch's commit
 	# message -- so they need the same direct supervision as gnome-shell.
-	# gsd-printer, gsd-backlight-helper and gsd-wacom-oled-helper are
+	# gsd-sharing is left out: it only manages sharing through systemd
+	# units. gsd-printer, gsd-backlight-helper and gsd-wacom-oled-helper are
 	# on-demand helpers invoked by other gsd plugins, not standalone
 	# autostart daemons, and are intentionally not listed here.
 	for gsd_plugin in ${gsd_plugins}; do

@@ -32,7 +32,9 @@ Sessions may restrict which services they run with a profile file,
 LIBEXECDIR/gnome-session/runit-sessions/<session>, listing service names
 one per line -- the stand-in for per-session systemd targets such as gdm's
 gnome-session@gnome-login.target drop-in. Sessions without a profile run
-every shipped service.
+every shipped service. Machines can additionally skip services with
+/etc/gnome-session/runit-sessions/<session>.disabled (same format), e.g.
+gsd-wwan without a modem.
 
 The gnome-session-leader-fifo write on shutdown is kept for protocol
 compatibility (matches leader-systemd.c/leader-openrc.c) even though
@@ -41,7 +43,7 @@ required for the leader to function.
 
 --- /dev/null
 +++ b/gnome-session/leader-runit.c
-@@ -0,0 +1,463 @@
+@@ -0,0 +1,472 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
 + *
 + * Copyright (C) 2006 Novell, Inc.
@@ -107,6 +109,9 @@ required for the leader to function.
 + * per-session systemd targets (e.g. gdm's gnome-session@gnome-login.target
 + * drop-in). Sessions without a profile run every shipped service. */
 +#define RUNIT_SESSIONS_DIR (LIBEXECDIR "/gnome-session/runit-sessions")
++/* Machine-local opt-outs: /etc/gnome-session/runit-sessions/<session>.disabled
++ * lists services (one per line) to skip, e.g. gsd-wwan without a modem. */
++#define RUNIT_DISABLED_DIR "/etc/gnome-session/runit-sessions"
 +#define SV_DOWN_TIMEOUT_SECS "5"
 +#define LEFTOVER_TERM_TIMEOUT_MS 3000
 +
@@ -339,15 +344,13 @@ required for the leader to function.
 + * the user can write to. Any tree left behind by a previous session is
 + * removed first. */
 +static GHashTable *
-+load_session_profile (const char *session_name)
++load_service_list (const char *path)
 +{
-+        g_autofree char *path = NULL;
 +        g_autofree char *contents = NULL;
 +        g_auto (GStrv) lines = NULL;
 +        g_autoptr (GError) error = NULL;
 +        GHashTable *services;
 +
-+        path = g_build_filename (RUNIT_SESSIONS_DIR, session_name, NULL);
 +        if (!g_file_get_contents (path, &contents, NULL, &error)) {
 +                if (!g_error_matches (error, G_FILE_ERROR, G_FILE_ERROR_NOENT))
 +                        g_warning ("Failed to read session profile %s: %s", path, error->message);
@@ -371,6 +374,8 @@ required for the leader to function.
 +setup_service_dir (const char *session_name)
 +{
 +        g_autoptr (GHashTable) profile = NULL;
++        g_autoptr (GHashTable) disabled = NULL;
++        g_autofree char *path = NULL;
 +        g_autoptr (GDir) dir = NULL;
 +        g_autoptr (GError) error = NULL;
 +        g_autofree char *parent = NULL;
@@ -389,7 +394,11 @@ required for the leader to function.
 +        if (g_mkdir_with_parents (service_dir, 0700) < 0)
 +                g_error ("Failed to create runit tree %s: %m", service_dir);
 +
-+        profile = load_session_profile (session_name);
++        path = g_build_filename (RUNIT_SESSIONS_DIR, session_name, NULL);
++        profile = load_service_list (path);
++        g_free (path);
++        path = g_strdup_printf ("%s/%s.disabled", RUNIT_DISABLED_DIR, session_name);
++        disabled = load_service_list (path);
 +
 +        dir = g_dir_open (RUNIT_TEMPLATE_DIR, 0, &error);
 +        if (dir == NULL)
@@ -401,6 +410,8 @@ required for the leader to function.
 +                g_autofree char *link = g_build_filename (svc, "run", NULL);
 +
 +                if (profile != NULL && !g_hash_table_remove (profile, name))
++                        continue;
++                if (disabled != NULL && g_hash_table_contains (disabled, name))
 +                        continue;
 +                if (!g_file_test (target, G_FILE_TEST_IS_EXECUTABLE))
 +                        continue;

@@ -8,6 +8,5 @@ gsd-keyboard
 gsd-media-keys
 gsd-power
 gsd-rfkill
-gsd-sharing
 gsd-smartcard
 gsd-usb-protection
