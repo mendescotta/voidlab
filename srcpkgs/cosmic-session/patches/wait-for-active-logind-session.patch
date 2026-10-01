@@ -1,0 +1,35 @@
+Display managers such as lightdm start the session command for Wayland
+sessions before the VT switch to the session's VT has completed, so the
+logind session is still inactive when cosmic-comp starts. cosmic-comp's
+KMS backend silently skips every DRM device while its libseat session is
+inactive (device_added returns no outputs) and then aborts with
+"Backend initialized without output", leaving a blank screen with a
+blinking cursor. KWin tolerates this by waiting for activation;
+cosmic-comp does not.
+
+Wait (up to 10s) for logind to report the session Active before
+starting cosmic-session. No-op when the session is already active or
+when XDG_SESSION_ID/loginctl are unavailable.
+
+--- a/data/start-cosmic	2026-09-29 22:43:37.415803154 +0300
++++ b/data/start-cosmic	2026-09-29 22:43:37.430069349 +0300
+@@ -109,6 +109,19 @@
+     done
+ fi
+ 
++# Wait for logind to mark this session active before starting the
++# compositor. Display managers such as lightdm launch Wayland sessions
++# before the VT switch completes; cosmic-comp silently skips every DRM
++# device while its libseat session is inactive and then exits with
++# "Backend initialized without output", leaving a blinking cursor.
++if [ -n "${XDG_SESSION_ID}" ] && command -v loginctl >/dev/null; then
++    i=0
++    while [ "$(loginctl show-session "${XDG_SESSION_ID}" -p Active --value 2>/dev/null)" = "no" ] && [ "$i" -lt 100 ]; do
++        sleep 0.1
++        i=$((i + 1))
++    done
++fi
++
+ # Run cosmic-session
+ if [ -z "${DBUS_SESSION_BUS_ADDRESS}" ]; then
+     exec /usr/bin/dbus-run-session -- /usr/bin/cosmic-session
