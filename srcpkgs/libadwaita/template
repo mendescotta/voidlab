@@ -1,6 +1,6 @@
 # Template file for 'libadwaita'
 pkgname=libadwaita
-version=1.9.4
+version=1.10.0
 revision=1
 build_style=meson
 build_helper="gir"
@@ -16,7 +16,7 @@ license="LGPL-2.0-or-later"
 homepage="https://gitlab.gnome.org/GNOME/libadwaita/"
 changelog="https://gitlab.gnome.org/GNOME/libadwaita/-/raw/libadwaita-1-9/NEWS"
 distfiles="${GNOME_SITE}/libadwaita/${version%.*}/libadwaita-${version}.tar.xz"
-checksum=f5ab3453ee743dc293cdf96d6821789cd20e8d125d9b41637703c12bfa4162ee
+checksum=b1bf56239269d101a6391ad4553c910eff9cc6170b803916405477ef60a66c84
 make_check_pre="dbus-run-session xvfb-run"
 
 build_options="gir gtk_doc"
