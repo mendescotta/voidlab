@@ -1,0 +1,8 @@
+# NetworkManager
+type = process
+command = /usr/libexec/dbus-wait-for -s -f 3 -n org.freedesktop.NetworkManager /usr/bin/NetworkManager -n
+ready-notification = pipefd:3
+smooth-recovery = true
+depends-on: dbus
+depends-on: pre-network.target
+before: network.target

@@ -1,9 +1,12 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.1
-revision=2
+revision=3
 # Void glue for dinit-chimera: device/console helpers, the power commands
-# (/usr/bin/init itself is dinit-chimera's env-cleaning wrapper), and base services (gettys, dhcpcd, sshd).
+# (/usr/bin/init itself is dinit-chimera's env-cleaning wrapper), and base services (gettys, dhcpcd, sshd, dbus, elogind,
+# polkitd, NetworkManager, display managers, chronyd). dbus-wait-for is q66's D-Bus readiness helper (BSD-2-Clause).
+hostmakedepends="pkg-config"
+makedepends="dbus-devel"
 depends="dinit dinit-chimera eudev kbd util-linux"
 short_desc="Void Linux integration for dinit-chimera"
 maintainer="mendescotta <mendescotta@gmail.com>"
@@ -12,7 +15,16 @@ homepage="https://github.com/mendescotta"
 # owns /usr/bin/{shutdown,halt,poweroff,reboot} like runit-void does
 conflicts="runit-void>=0"
 
+do_build() {
+	${CC} ${CFLAGS} ${LDFLAGS} -o dbus-wait-for ${FILESDIR}/dbus-wait-for.c \
+		$(pkg-config --cflags --libs dbus-1)
+}
+
 do_install() {
+	vlicense ${FILESDIR}/COPYING.noid-dinit COPYING
+	vinstall dbus-wait-for 755 usr/libexec
+	vinstall ${FILESDIR}/dinit-dbus 755 usr/libexec
+	vinstall ${FILESDIR}/dinit-dm 755 usr/libexec
 	vinstall ${FILESDIR}/dinit-devd 755 usr/libexec
 	vinstall ${FILESDIR}/dinit-console 755 usr/libexec
 	vinstall ${FILESDIR}/agetty-default 755 usr/lib/dinit
@@ -29,7 +41,8 @@ do_install() {
 		sed "s/@TTY@/tty$c/g" ${FILESDIR}/agetty.in \
 			> ${DESTDIR}/etc/dinit.d/agetty-tty$c
 	done
-	for c in dhcpcd sshd ssh-keygen; do
+	for c in dhcpcd sshd ssh-keygen dbus elogind polkitd NetworkManager \
+		lightdm gdm sddm cosmic-greeter-daemon cosmic-greeter chronyd; do
 		vinstall ${FILESDIR}/$c.service 644 etc/dinit.d $c
 	done
 }

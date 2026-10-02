@@ -1,0 +1,7 @@
+# sddm display manager
+type = process
+command = /usr/libexec/dinit-dm sddm /usr/bin/sddm
+smooth-recovery = true
+depends-on: dbus
+depends-on: elogind
+depends-on: login.target

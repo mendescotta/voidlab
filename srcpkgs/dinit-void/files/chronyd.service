@@ -1,0 +1,6 @@
+# NTP client
+type = process
+command = /usr/libexec/dinit-dm chronyd /usr/bin/chronyd -n -u chrony
+smooth-recovery = true
+depends-on: local.target
+after: network.target
