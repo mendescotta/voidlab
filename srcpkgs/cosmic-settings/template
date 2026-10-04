@@ -1,7 +1,7 @@
 # Template file for 'cosmic-settings'
 pkgname=cosmic-settings
 version=1.9.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style="cargo"
 configure_args="--workspace"

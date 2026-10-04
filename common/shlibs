@@ -15,3 +15,4 @@ libmutter-cogl-51.so.0 mutter-51.0_1
 libmutter-cogl-pango-18.so.0 mutter-50.0_1
 libmutter-mtk-18.so.0 mutter-50.0_1
 libmutter-mtk-51.so.0 mutter-51.0_1
+libaccountsservice.so.1 accountsservice-26.27.3_1
