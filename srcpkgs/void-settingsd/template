@@ -7,9 +7,10 @@ depends="dbus polkit tzdata"
 short_desc="hostname1, timedate1 and locale1 D-Bus services and ctl wrappers"
 maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
-homepage="https://github.com/mendescotta/systemd-shim-void"
-distfiles="https://github.com/mendescotta/systemd-shim-void/archive/v${version}.tar.gz>void-settingsd-${version}.tar.gz"
-checksum=a3032b3aa2b358c8cdfd831bfc8a724de7cdb296f0473d4a315b2d176d3264b8
+homepage="https://github.com/mendescotta/systemd-shim"
+distfiles="https://github.com/mendescotta/systemd-shim/archive/v${version}.tar.gz>void-settingsd-${version}.tar.gz"
+wrksrc="systemd-shim-${version}"
+checksum=5d0b4022769a4a1143c19a4fb5a7c9c4f033728eadb19c5441dc43643336c4c4
 
 do_install() {
 	vinstall target/${RUST_TARGET}/release/void-settingsd 755 usr/libexec
