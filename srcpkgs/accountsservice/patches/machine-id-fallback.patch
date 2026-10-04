@@ -1,0 +1,12 @@
+--- a/src/util.c	2026-10-04 13:13:49.182587160 +0300
++++ b/src/util.c	2026-10-04 13:13:49.202292551 +0300
+@@ -459,7 +459,8 @@
+ {
+         g_autoptr (GError) error = NULL;
+ 
+-        if (!g_file_get_contents ("/etc/machine-id", &machine_id, NULL, &error))
++        if (!g_file_get_contents ("/etc/machine-id", &machine_id, NULL, NULL) &&
++            !g_file_get_contents ("/var/lib/dbus/machine-id", &machine_id, NULL, &error))
+                 g_error ("Failed to read machine-id: %s", error->message);
+ 
+         machine_id = g_strchomp (machine_id);
