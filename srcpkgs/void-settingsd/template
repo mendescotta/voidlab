@@ -1,18 +1,22 @@
 # Template file for 'void-settingsd'
 pkgname=void-settingsd
-version=0.1.0
+version=0.2.0
 revision=1
 build_style=cargo
 depends="dbus polkit tzdata"
-short_desc="hostname1, timedate1 and locale1 D-Bus services for runit systems"
+short_desc="hostname1, timedate1 and locale1 D-Bus services and ctl wrappers"
 maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/systemd-shim-void"
 distfiles="https://github.com/mendescotta/systemd-shim-void/archive/v${version}.tar.gz>void-settingsd-${version}.tar.gz"
-checksum=c012748fd3a3143f4a8a0a6e7ce6701bcfc069e56cf296d926c64838e9c4c41c
+checksum=a3032b3aa2b358c8cdfd831bfc8a724de7cdb296f0473d4a315b2d176d3264b8
 
 do_install() {
 	vinstall target/${RUST_TARGET}/release/void-settingsd 755 usr/libexec
+	vbin target/${RUST_TARGET}/release/void-settingsctl
+	for n in timedatectl hostnamectl localectl; do
+		ln -s void-settingsctl ${DESTDIR}/usr/bin/${n}
+	done
 	vinstall data/org.freedesktop.settingsd.conf 644 usr/share/dbus-1/system.d
 	vinstall data/org.freedesktop.settingsd.policy 644 usr/share/polkit-1/actions
 	for n in hostname1 timedate1 locale1; do
