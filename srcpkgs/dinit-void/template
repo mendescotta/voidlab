@@ -1,7 +1,7 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.1
-revision=3
+revision=4
 # Void glue for dinit-chimera: device/console helpers, the power commands
 # (/usr/bin/init itself is dinit-chimera's env-cleaning wrapper), and base services (gettys, dhcpcd, sshd, dbus, elogind,
 # polkitd, NetworkManager, display managers, chronyd). dbus-wait-for is q66's D-Bus readiness helper (BSD-2-Clause).
@@ -21,7 +21,7 @@ do_build() {
 }
 
 do_install() {
-	vlicense ${FILESDIR}/COPYING.noid-dinit COPYING
+	vlicense ${FILESDIR}/COPYING.dinit-glue COPYING
 	vinstall dbus-wait-for 755 usr/libexec
 	vinstall ${FILESDIR}/dinit-dbus 755 usr/libexec
 	vinstall ${FILESDIR}/dinit-dm 755 usr/libexec

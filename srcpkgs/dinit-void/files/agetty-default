@@ -1,7 +1,7 @@
 #!/bin/sh
 # Shared getty runner for the agetty-* dinit services.
 # The GETTY_ARGS="$GETTY_ARGS --noclear" line is matched verbatim by
-# noid-mklive's live autologin hook (dracut/vmklive/adduser.sh); keep it.
+# live ISO's autologin hook (dracut vmklive/adduser.sh, from vessel); keep it.
 
 tty=$1
 GETTY_ARGS=""
