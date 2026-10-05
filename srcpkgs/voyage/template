@@ -1,7 +1,7 @@
 # Template file for 'voyage'
 pkgname=voyage
 version=0.1.0
-revision=3
+revision=4
 build_style=cargo
 hostmakedepends="pkg-config"
 makedepends="gtk4-devel libadwaita-devel glib-devel"
@@ -11,7 +11,7 @@ maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/voyage"
 distfiles="https://github.com/mendescotta/voyage/archive/refs/tags/v${version}.tar.gz"
-checksum=7769aef75b5e6f1aecaed8b7c926c2955baf3ea02ec6f24b3d72763bd01bc29c
+checksum=4f976c3f20d59ba0653d3baf046e1ea3a69887023cf1156736733ad03b9ea5fa
 
 do_install() {
 	vbin target/${RUST_TARGET}/release/voyage
