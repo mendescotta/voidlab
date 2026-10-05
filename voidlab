@@ -6,6 +6,10 @@ UP=$ROOT/.upstream
 HOSTDIR=$ROOT/hostdir
 MASTERDIR=$ROOT/masterdir
 REPO=$ROOT/repo
+DIST=$ROOT/dist
+KEY=${VOIDLAB_KEY:-$HOME/.config/voidlab/privkey.pem}
+GH_REPO=${VOIDLAB_GH_REPO:-mendescotta/voidlab}
+RELEASE_TAG=${VOIDLAB_RELEASE_TAG:-repo}
 UPSTREAM_URL=${VOIDLAB_UPSTREAM_URL:-https://github.com/void-linux/void-packages}
 
 die()  { echo "voidlab: $*" >&2; exit 1; }
@@ -154,10 +158,49 @@ cmd_status() {
 	done
 }
 
+cmd_keygen() {
+	need openssl
+	[ ! -e "$KEY" ] || die "key already exists: $KEY"
+	mkdir -p "$(dirname "$KEY")"
+	(umask 077 && openssl genrsa -out "$KEY" 4096 2>/dev/null)
+	echo "created $KEY (keep it private, never commit it)"
+}
+
+cmd_publish() {
+	need gh xbps-rindex
+	[ -f "$KEY" ] || die "no signing key at $KEY; run: voidlab keygen"
+	[ -f "$REPO/x86_64-repodata" ] || die "nothing to publish; run: voidlab build <pkg>"
+	rm -rf "$DIST"
+	mkdir -p "$DIST"
+	cp "$REPO"/*.xbps "$REPO/x86_64-repodata" "$DIST/"
+	xbps-rindex --privkey "$KEY" --signedby "voidlab <${GH_REPO%%/*}>" --sign "$DIST" >/dev/null
+	xbps-rindex --privkey "$KEY" --sign-pkg "$DIST"/*.xbps >/dev/null
+	gh release view "$RELEASE_TAG" -R "$GH_REPO" >/dev/null 2>&1 ||
+		gh release create "$RELEASE_TAG" -R "$GH_REPO" --prerelease \
+			--title "voidlab binary repository" \
+			--notes "xbps repository, see README. Updated in place by \`voidlab publish\`."
+	local remote f n
+	remote=$(gh release view "$RELEASE_TAG" -R "$GH_REPO" --json assets -q '.assets[] | "\(.name) \(.size)"')
+	local up=()
+	for f in "$DIST"/*; do
+		n=${f##*/}
+		case $n in *-repodata) up+=("$f"); continue ;; esac
+		grep -qxF "$n $(stat -c %s "$f")" <<<"$remote" || up+=("$f")
+	done
+	echo "=> uploading ${#up[@]} of $(ls "$DIST" | wc -l) files"
+	[ ${#up[@]} -eq 0 ] || gh release upload "$RELEASE_TAG" -R "$GH_REPO" --clobber "${up[@]}"
+	while read -r n _; do
+		[ -n "$n" ] && [ ! -e "$DIST/$n" ] && gh release delete-asset "$RELEASE_TAG" "$n" -R "$GH_REPO" -y
+	done <<<"$remote"
+	echo "repository: https://github.com/$GH_REPO/releases/download/$RELEASE_TAG"
+}
+
 case ${1:-} in
 sync)    shift; cmd_sync "$@" ;;
 overlay) shift; cmd_overlay "$@" ;;
 build)   shift; cmd_build "$@" ;;
 status)  shift; cmd_status "$@" ;;
-*) echo "usage: voidlab {sync|overlay|build <pkg>...|status}" >&2; exit 2 ;;
+keygen)  shift; cmd_keygen "$@" ;;
+publish) shift; cmd_publish "$@" ;;
+*) echo "usage: voidlab {sync|overlay|build <pkg>...|status|keygen|publish}" >&2; exit 2 ;;
 esac
