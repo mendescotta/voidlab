@@ -1,7 +1,7 @@
 # Template file for 'nerd-fonts-cascadiacode'
 pkgname=nerd-fonts-cascadiacode
 version=3.5.1
-revision=1
+revision=2
 create_wrksrc=yes
 depends="font-util"
 short_desc="Nerd Fonts patched Cascadia Code (CaskaydiaCove)"
@@ -13,9 +13,14 @@ checksum=ae598e9401e2846aa3ee364513715de0490b844a4b54f0768991f45f23aa8369
 font_dirs="/usr/share/fonts/TTF"
 
 do_install() {
+	# Only the families and styles the live ISO configures (regular and Mono;
+	# regular, bold, italic, bold italic). The full set is ~100 MB.
 	vmkdir usr/share/fonts/TTF
-	for f in *.ttf; do
-		vinstall "$f" 644 usr/share/fonts/TTF
+	local family style
+	for family in NerdFont NerdFontMono; do
+		for style in Regular Bold Italic BoldItalic; do
+			vinstall "CaskaydiaCove${family}-${style}.ttf" 644 usr/share/fonts/TTF
+		done
 	done
 	vlicense LICENSE
 }

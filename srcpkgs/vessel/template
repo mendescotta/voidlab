@@ -1,7 +1,7 @@
 # Template file for 'vessel'
 pkgname=vessel
 version=0.1.0
-revision=2
+revision=3
 build_style=cargo
 hostmakedepends="pkg-config"
 makedepends="gtk4-devel libadwaita-devel glib-devel"
@@ -11,7 +11,7 @@ maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/vessel"
 distfiles="https://github.com/mendescotta/vessel/archive/refs/tags/v${version}.tar.gz"
-checksum=fdb6eb2316298cd884c9a7a18e472c9e0417aef16c6e3b2b4c902c91f6655a24
+checksum=e4374299abcec286b92e3049e62c94eb89f9c88787987be5128ea862f7fcdfb0
 
 do_install() {
 	vbin target/${RUST_TARGET}/release/vessel
