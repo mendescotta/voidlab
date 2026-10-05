@@ -180,12 +180,12 @@ cmd_publish() {
 			--title "voidlab binary repository" \
 			--notes "xbps repository, see README. Updated in place by \`voidlab publish\`."
 	local remote f n
-	remote=$(gh release view "$RELEASE_TAG" -R "$GH_REPO" --json assets -q '.assets[] | "\(.name) \(.size)"')
+	remote=$(gh release view "$RELEASE_TAG" -R "$GH_REPO" --json assets -q '.assets[] | "\(.name) \(.digest)"')
 	local up=()
 	for f in "$DIST"/*; do
 		n=${f##*/}
 		case $n in *-repodata) up+=("$f"); continue ;; esac
-		grep -qxF "$n $(stat -c %s "$f")" <<<"$remote" || up+=("$f")
+		grep -qxF "$n sha256:$(sha256sum "$f" | cut -d" " -f1)" <<<"$remote" || up+=("$f")
 	done
 	echo "=> uploading ${#up[@]} of $(ls "$DIST" | wc -l) files"
 	[ ${#up[@]} -eq 0 ] || gh release upload "$RELEASE_TAG" -R "$GH_REPO" --clobber "${up[@]}"
