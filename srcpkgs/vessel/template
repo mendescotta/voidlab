@@ -1,0 +1,20 @@
+# Template file for 'vessel'
+pkgname=vessel
+version=0.1.0
+revision=1
+build_style=cargo
+hostmakedepends="pkg-config"
+makedepends="gtk4-devel libadwaita-devel glib-devel"
+depends="polkit xbps dracut squashfs-tools xorriso mtools dosfstools e2fsprogs"
+short_desc="GTK4 app that composes a Void Linux live ISO from a profile"
+maintainer="gui <mendescotta@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/mendescotta/vessel"
+distfiles="https://github.com/mendescotta/vessel/archive/refs/tags/v${version}.tar.gz"
+checksum=9cac39f8d5119bec77c48f7c554c58a122c9b69e472ace9cc6d90e1bcf044d7c
+
+do_install() {
+	vbin target/${RUST_TARGET}/release/vessel
+	vinstall packaging/vessel-run-build 755 usr/libexec/vessel run-build
+	vinstall packaging/org.voidlinux.vessel.policy 644 usr/share/polkit-1/actions
+}
