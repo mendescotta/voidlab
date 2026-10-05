@@ -1,0 +1,14 @@
+# Template file for 'gnome-power-manager'
+pkgname=gnome-power-manager
+version=50.0
+revision=1
+build_style=meson
+hostmakedepends="glib-devel pkg-config gettext"
+makedepends="gtk4-devel upower-devel"
+depends="desktop-file-utils hicolor-icon-theme upower"
+short_desc="GNOME power management tool"
+maintainer="Enno Boland <gottox@voidlinux.org>"
+license="GPL-2.0-or-later"
+homepage="http://www.gnome.org/projects/gnome-power-manager/"
+distfiles="${GNOME_SITE}/${pkgname}/${version%.*}/${pkgname}-${version}.tar.xz"
+checksum=bf243d6389f8bfa71c958534ed2669b29965c47f55c3cbe4983b296d0f99e5d7

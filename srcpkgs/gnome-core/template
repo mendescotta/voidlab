@@ -1,7 +1,7 @@
 # Template file for 'gnome-core'
 pkgname=gnome-core
 version=51.0
-revision=3
+revision=4
 metapackage=yes
 short_desc="GNOME meta-package for Void Linux - core components"
 maintainer="Orphaned <orphan@voidlinux.org>"
@@ -31,7 +31,6 @@ depends="
  gnome-shell>=${version}
  gnome-themes-extra>=3.28
  gnome-user-docs>=47.3
- gnome-video-effects>=0.6.0
  gsettings-desktop-schemas>=${version}
  gvfs>=1.56.1
  localsearch>=3.11.0
