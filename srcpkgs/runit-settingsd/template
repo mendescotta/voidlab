@@ -1,0 +1,28 @@
+# Template file for 'runit-settingsd'
+pkgname=runit-settingsd
+version=0.3.0
+revision=1
+build_style=cargo
+depends="dbus polkit tzdata"
+short_desc="Hostname1, timedate1 and locale1 D-Bus services and ctl wrappers"
+maintainer="gui <mendescotta@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/mendescotta/runit-settingsd"
+distfiles="https://github.com/mendescotta/runit-settingsd/archive/v${version}.tar.gz>runit-settingsd-${version}.tar.gz"
+checksum=9a383896b561fb0e10de65d11518246bbc0fd0614088989d5544f7f8c6f8e80e
+replaces="void-settingsd>=0"
+
+do_install() {
+	vinstall target/${RUST_TARGET}/release/runit-settingsd 755 usr/libexec
+	vbin target/${RUST_TARGET}/release/runit-settingsctl
+	for n in timedatectl hostnamectl localectl; do
+		ln -s runit-settingsctl ${DESTDIR}/usr/bin/${n}
+	done
+	vman man/runit-settingsd.8
+	vman man/runit-settingsctl.1
+	vinstall data/org.freedesktop.settingsd.conf 644 usr/share/dbus-1/system.d
+	vinstall data/org.freedesktop.settingsd.policy 644 usr/share/polkit-1/actions
+	for n in hostname1 timedate1 locale1; do
+		vinstall data/org.freedesktop.${n}.service 644 usr/share/dbus-1/system-services
+	done
+}
