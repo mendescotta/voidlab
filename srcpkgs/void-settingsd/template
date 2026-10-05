@@ -9,7 +9,7 @@ maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/void-settingsd"
 distfiles="https://github.com/mendescotta/void-settingsd/archive/v${version}.tar.gz>void-settingsd-${version}.tar.gz"
-checksum=19d342aa0e30d703e95d7d6b97a0366788dfd807936a3232b6830df9c8fcccde
+checksum=4467676a65d46ffbae13ff8a52125f1ffba882fdda9b2dafa01c4c7c0956d404
 
 do_install() {
 	vinstall target/${RUST_TARGET}/release/void-settingsd 755 usr/libexec
