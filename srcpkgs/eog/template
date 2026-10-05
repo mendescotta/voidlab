@@ -1,7 +1,7 @@
 # Template file for 'eog'
 pkgname=eog
-version=50.0
-revision=2
+version=50.3
+revision=1
 build_helper="gir"
 build_style=meson
 configure_args="-Dintrospection=$(vopt_if gir true false)"
@@ -15,7 +15,7 @@ license="GPL-2.0-or-later"
 homepage="https://gitlab.gnome.org/GNOME/eog/"
 changelog="https://gitlab.gnome.org/GNOME/eog/-/raw/master/NEWS"
 distfiles="${GNOME_SITE}/eog/${version%.*}/eog-${version}.tar.xz"
-checksum=5c0226d10cfa13569ade2218f03ce62f79b8dc5c288e2e0b123d2ef51abdcb07
+checksum=37280cd3874c6f219012b219f9f2c83bd88d750bf25f05bc7f742f41018466f4
 shlib_provides="libeog.so"
 lib32disabled=yes
 

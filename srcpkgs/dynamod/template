@@ -6,26 +6,22 @@
 # Zig 0.15.2 directly (Void's packaged zig is 0.13.0, dynamod requires
 # >=0.15.2), builds the sdnotify shim and PAM module the upstream draft
 # template omits, and drops the musl-only makedepends.
-#
-# Tracks a specific commit rather than a release (dynamod has no tagged
-# releases yet).
-_commit=3776c3fb66182a981a05ace4fa9d8634f9a76cd2
 _zig_version=0.15.2
 pkgname=dynamod
-version=0.1.0
-revision=2
+version=0.1.1
+revision=1
 hostmakedepends="cargo pkg-config tar xz"
 depends="dbus"
 short_desc="Zig+Rust PID 1 init system with OTP supervisor trees"
 maintainer="gui <mendescotta@gmail.com>"
 license="MIT"
 homepage="https://github.com/sinisterMage/dynamod"
-distfiles="https://github.com/sinisterMage/dynamod/archive/${_commit}.tar.gz>dynamod-${_commit}.tar.gz
+distfiles="https://github.com/sinisterMage/dynamod/archive/refs/tags/v${version}.tar.gz>dynamod-${version}.tar.gz
  https://ziglang.org/download/${_zig_version}/zig-x86_64-linux-${_zig_version}.tar.xz"
-checksum="26683f3df71c3dbaf82795ff8c8379d720eb246d04a0e84e459c2df3d4c50489
+checksum="889583460efc3fdf5fee0b93b8b348c2b7fe4ad00deb0cbddb8965d24991f38e
  02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239"
 skip_extraction="zig-x86_64-linux-${_zig_version}.tar.xz"
-wrksrc="dynamod-${_commit}"
+wrksrc="dynamod-${version}"
 
 post_extract() {
 	# The Zig tarball is skip_extraction'd (it's a toolchain, not source);

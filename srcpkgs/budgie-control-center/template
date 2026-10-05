@@ -1,7 +1,7 @@
 # Template file for 'budgie-control-center'
 pkgname=budgie-control-center
-version=1.4.0
-revision=3
+version=2.1.3
+revision=1
 build_style=meson
 hostmakedepends="glib-devel gsettings-desktop-schemas-devel gettext pkg-config
  polkit python3 libxml2"
@@ -20,7 +20,7 @@ maintainer="Orphaned <orphan@voidlinux.org>"
 license="GPL-2.0-or-later"
 homepage="https://github.com/BuddiesOfBudgie/budgie-control-center"
 distfiles="https://github.com/BuddiesOfBudgie/budgie-control-center/releases/download/v${version}/budgie-control-center-${version}.tar.xz"
-checksum=120d760b6c1190e937cc7f3b3c50227682960123ff0bccfe3ff4902785550d82
+checksum=ad173a72bc8e06b9e256589593a9c2853bc46746e74076d0052af0150d14600a
 replaces="budgie-control-center-devel>=0"
 
 budgie-control-center-devel_package() {
