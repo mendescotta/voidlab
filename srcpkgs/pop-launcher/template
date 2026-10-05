@@ -2,11 +2,10 @@
 pkgname=pop-launcher
 version=1.9.0
 revision=1
+archs="x86_64*"
 build_style="cargo"
 configure_args="--workspace"
-build_options="sccache"
-archs="x86_64*"
-hostmakedepends="pkg-config just $(vopt_if sccache "rust-sccache")"
+hostmakedepends="pkg-config just"
 makedepends="libxkbcommon-devel"
 depends="cosmic-icons dbus fd libqalculate libxkbcommon xdg-utils"
 short_desc="Modular IPC-based desktop launcher service"
@@ -15,6 +14,8 @@ license="MPL-2.0 AND GPL-3.0-only"
 homepage="https://github.com/pop-os/launcher"
 distfiles="https://github.com/pop-os/launcher/archive/refs/tags/epoch-${version}.tar.gz"
 checksum=86907d81d7a97938076455be3b9e4f093fb90760a95c1e0558a04350e5701fb5
+build_options="sccache"
+hostmakedepends+=" $(vopt_if sccache rust-sccache)"
 
 pre_build() {
 	$(vopt_if sccache "export RUSTC_WRAPPER=/usr/bin/sccache")

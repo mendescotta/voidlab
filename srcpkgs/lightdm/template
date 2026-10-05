@@ -41,7 +41,7 @@ fi
 
 pre_configure() {
 	# release tarballs no longer ship a generated configure script
-	sed -i 's/`which yelp-build`/`command -v yelp-build`/' autogen.sh
+	sed -i 's/which yelp-build/command -v yelp-build/' autogen.sh
 	NOCONFIGURE=1 ./autogen.sh
 }
 

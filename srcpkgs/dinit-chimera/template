@@ -8,8 +8,6 @@ hostmakedepends="pkg-config"
 makedepends="libkmod-devel"
 # dinit-devd/dinit-console helpers come from dinit-void (Void glue)
 depends="dinit sd-tools kmod util-linux"
-# ships /usr/bin/init (a wrapper that execs dinit), as runit-void does
-conflicts="runit-void>=0"
 # service enablement dirs (the boot/system targets' waits-for.d); tmpfiles
 # only creates them at boot, too late for tools that enable services offline
 make_dirs="
@@ -21,6 +19,8 @@ license="BSD-2-Clause"
 homepage="https://github.com/chimera-linux/dinit-chimera"
 distfiles="https://github.com/chimera-linux/dinit-chimera/archive/v${version}.tar.gz"
 checksum=777dbee5a69f96a1a4cd812c7fa3dce62a7247a4be99420832a778e548c357f7
+# ships /usr/bin/init (a wrapper that execs dinit), as runit-void does
+conflicts="runit-void>=0"
 
 post_install() {
 	vlicense COPYING.md

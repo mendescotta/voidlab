@@ -15,7 +15,6 @@ pkgname=dynamod
 version=0.1.0
 revision=2
 hostmakedepends="cargo pkg-config tar xz"
-makedepends=""
 depends="dbus"
 short_desc="Zig+Rust PID 1 init system with OTP supervisor trees"
 maintainer="gui <mendescotta@gmail.com>"
@@ -85,7 +84,7 @@ do_install() {
 	vinstall "${_rustout}/dynamod-logind" 755 usr/lib/dynamod
 	vinstall "${_rustout}/dynamod-sd1bridge" 755 usr/lib/dynamod
 	vinstall "${_rustout}/dynamod-hostnamed" 755 usr/lib/dynamod
-	vinstall "${_rustout}/dynamodctl" 755 usr/bin
+	vbin "${_rustout}/dynamodctl"
 
 	# systemd-shim library. Cargo's cdylib output is always lib<name>.so;
 	# [lib] name = "systemd" in dynamod-sdnotify's Cargo.toml gives us
