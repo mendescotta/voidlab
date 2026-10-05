@@ -87,7 +87,7 @@ index_repo() {
 	set -- "$REPO"/*.xbps
 	shopt -u nullglob
 	[ $# -gt 0 ] || return 0
-	xbps-rindex -a "$@" >/dev/null
+	xbps-rindex -f -a "$@" >/dev/null
 	xbps-rindex -r "$REPO" >/dev/null
 }
 
