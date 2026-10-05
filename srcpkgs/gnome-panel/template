@@ -1,7 +1,7 @@
 # Template file for 'gnome-panel'
 pkgname=gnome-panel
-version=3.58.1
-revision=1
+version=3.52.0
+revision=2
 build_style=gnu-configure
 configure_args="ax_cv_zoneinfo_tzdir=/usr/share/zoneinfo"
 hostmakedepends="gettext-devel glib-devel itstool pkg-config gettext"
@@ -15,7 +15,7 @@ license="GPL-2.0-or-later, GFDL-1.1-or-later, LGPL-2.1-or-later"
 homepage="https://wiki.gnome.org/Projects/GnomePanel"
 changelog="https://gitlab.gnome.org/GNOME/gnome-panel/-/raw/master/NEWS"
 distfiles="${GNOME_SITE}/gnome-panel/${version%.*}/gnome-panel-${version}.tar.xz"
-checksum=7e8bca43a81a134c666b3a78baf2affb0c5d30efb1bca653887fc41b31dd5e64
+checksum=9e29ba8873cde40d40c2934a464f8f43ba2eb1b522b191447caa27dd7853c5d4
 
 gnome-panel-devel_package() {
 	depends="glib-devel gtk+3-devel ${sourcepkg}>=${version}_${revision}"
