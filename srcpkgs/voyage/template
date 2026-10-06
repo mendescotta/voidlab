@@ -1,17 +1,17 @@
 # Template file for 'voyage'
 pkgname=voyage
-version=0.1.0
-revision=4
+version=0.2.0
+revision=1
 build_style=cargo
 hostmakedepends="pkg-config"
-makedepends="gtk4-devel libadwaita-devel glib-devel"
+makedepends="gtk4-devel glib-devel"
 depends="polkit parted gptfdisk efibootmgr dosfstools e2fsprogs xmirror"
 short_desc="GTK4 installer for Void Linux built on the void-installer backend"
 maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/voyage"
 distfiles="https://github.com/mendescotta/voyage/archive/refs/tags/v${version}.tar.gz"
-checksum=4f976c3f20d59ba0653d3baf046e1ea3a69887023cf1156736733ad03b9ea5fa
+checksum=18dadd46a55f1fc8eb5fc188f34f6b59076e53f4b237f4d83e6e05a30d169242
 
 do_install() {
 	vbin target/${RUST_TARGET}/release/voyage
