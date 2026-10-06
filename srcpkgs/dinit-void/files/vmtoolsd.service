@@ -1,0 +1,5 @@
+# VMware guest tools
+type = process
+command = /usr/bin/vmtoolsd
+smooth-recovery = true
+depends-on: local.target

@@ -445,7 +445,10 @@ int main(int argc, char **argv) {
     bd.pid_serial = 0;
     bd.parent_pid = getpid();
 
-    while ((c = getopt(argc, argv, "a:e:f:hn:Pst:")) > 0) {
+    /* The leading '+' stops option parsing at the first non-option, as on musl (where this
+     * was written). glibc's getopt permutes arguments instead and would take the wrapped
+     * command's own options ("NetworkManager -n", "polkitd --no-debug") for ours. */
+    while ((c = getopt(argc, argv, "+a:e:f:hn:Pst:")) > 0) {
         switch (c) {
             case 'h':
                 usage(stdout);

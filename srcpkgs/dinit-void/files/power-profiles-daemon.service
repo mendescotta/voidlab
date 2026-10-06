@@ -1,0 +1,5 @@
+# Power profiles daemon
+type = process
+command = /usr/libexec/power-profiles-daemon
+smooth-recovery = true
+depends-on: dbus

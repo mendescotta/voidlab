@@ -1,7 +1,7 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.99.25
-revision=2
+revision=4
 # Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
 # device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
 # dbus, elogind, polkitd, NetworkManager, display managers, chronyd).
@@ -68,7 +68,9 @@ EOF2
 			> ${DESTDIR}/etc/dinit.d/agetty-tty$c
 	done
 	for c in dhcpcd sshd ssh-keygen dbus elogind polkitd NetworkManager \
-		lightdm gdm sddm cosmic-greeter-daemon cosmic-greeter chronyd; do
+		lightdm gdm sddm cosmic-greeter-daemon cosmic-greeter chronyd \
+		vmtoolsd vmware-vmblock-fuse vboxservice spice-vdagentd \
+		power-profiles-daemon switcheroo-control; do
 		vinstall ${FILESDIR}/$c.service 644 etc/dinit.d $c
 	done
 }
