@@ -1,0 +1,29 @@
+# Template file for 'dinit-settingsd'
+pkgname=dinit-settingsd
+version=0.1.0
+revision=1
+build_style=cargo
+depends="dbus polkit tzdata dinit"
+short_desc="Hostname1, timedate1 and locale1 D-Bus services for dinit, with ctl wrappers"
+maintainer="gui <mendescotta@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/mendescotta/dinit-settingsd"
+distfiles="https://github.com/mendescotta/dinit-settingsd/archive/v${version}.tar.gz>dinit-settingsd-${version}.tar.gz"
+checksum=0152498b997aaa3a5314fd15646291c18a0202f04a31205216c3f85652d1188a
+# same D-Bus names, ctl symlinks and polkit actions as runit-settingsd
+conflicts="runit-settingsd>=0"
+
+do_install() {
+	vinstall target/${RUST_TARGET}/release/dinit-settingsd 755 usr/libexec
+	vbin target/${RUST_TARGET}/release/dinit-settingsctl
+	for n in timedatectl hostnamectl localectl; do
+		ln -s dinit-settingsctl ${DESTDIR}/usr/bin/${n}
+	done
+	vman man/dinit-settingsd.8
+	vman man/dinit-settingsctl.1
+	vinstall data/org.freedesktop.settingsd.conf 644 usr/share/dbus-1/system.d
+	vinstall data/org.freedesktop.settingsd.policy 644 usr/share/polkit-1/actions
+	for n in hostname1 timedate1 locale1; do
+		vinstall data/org.freedesktop.${n}.service 644 usr/share/dbus-1/system-services
+	done
+}
