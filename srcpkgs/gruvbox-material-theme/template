@@ -1,10 +1,10 @@
 # Template file for 'gruvbox-material-theme'
 pkgname=gruvbox-material-theme
 version=0.20250117
-revision=1
+revision=2
 _commit=bb306ae972273cbfcbf78f8b772662e8b0678d82
 wrksrc="gruvbox-material-gtk-${_commit}"
-depends="gtk-engine-murrine gnome-themes-extra"
+depends="adwaita-icon-theme hicolor-icon-theme"
 short_desc="Gruvbox Material GTK theme and icon theme"
 maintainer="gui <mendescotta@gmail.com>"
 license="MIT"
@@ -13,9 +13,18 @@ distfiles="https://github.com/sainnhe/gruvbox-material-gtk/archive/${_commit}.ta
 checksum=67126883eebaa480aa1ff85e3582aba1c2ea7b44ff41bc1afc139ee77ab05568
 
 do_install() {
-	vmkdir usr/share/themes
+	local d
+
+	# Only the GTK3/GTK4/xfwm4 parts are used. Skipping the GTK2, Cinnamon, GNOME
+	# Shell, Unity, Plank and Metacity variants lets us drop the gtk+2,
+	# gtk-engine-murrine and gnome-themes-extra dependencies.
+	vmkdir usr/share/themes/Gruvbox-Material-Dark
+	for d in gtk-3.0 gtk-4.0 xfwm4; do
+		vcopy themes/Gruvbox-Material-Dark/$d usr/share/themes/Gruvbox-Material-Dark
+	done
+	vinstall themes/Gruvbox-Material-Dark/index.theme 644 usr/share/themes/Gruvbox-Material-Dark
+
 	vmkdir usr/share/icons
-	vcopy themes/Gruvbox-Material-Dark usr/share/themes
 	vcopy icons/Gruvbox-Material-Dark usr/share/icons
 	vlicense LICENSE
 }

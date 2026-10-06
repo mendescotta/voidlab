@@ -1,0 +1,30 @@
+# Template file for 'xfce-core'
+pkgname=xfce-core
+version=4.20
+revision=1
+metapackage=yes
+# The xfce4 meta minus its optional apps (parole, ristretto, mousepad),
+# thumbnails (tumbler pulls ffmpegthumbnailer and ffmpeg) and xfwm4-themes.
+depends="
+ Thunar>=${version}
+ exo>=${version}
+ thunar-volman>=${version}
+ upower
+ xdg-user-dirs-gtk
+ xfce-polkit
+ xfce4-appfinder>=${version}
+ xfce4-notifyd
+ xfce4-panel>=${version}
+ xfce4-power-manager>=${version}
+ xfce4-screensaver
+ xfce4-session>=${version}
+ xfce4-settings>=${version}
+ xfce4-taskmanager
+ xfce4-terminal
+ xfconf>=${version}
+ xfdesktop>=${version}
+ xfwm4>=${version}"
+short_desc="Xfce desktop meta-package - core components only"
+maintainer="mendescotta <mendescotta@gmail.com>"
+license="Public Domain"
+homepage="https://www.xfce.org"

@@ -1,10 +1,11 @@
 # Template file for 'gtk4'
 pkgname=gtk4
 version=4.24.1
-revision=1
+revision=3
 build_style=meson
 build_helper="gir"
 configure_args="-Dman-pages=true -Ddocumentation=true -Dbuild-tests=false
+ -Dmedia-gstreamer=disabled
  -Dbuild-testsuite=false -Dbuild-examples=false
  $(vopt_bool broadway broadway-backend)
  $(vopt_bool x11 x11-backend)
@@ -18,14 +19,16 @@ hostmakedepends="gettext-devel glib-devel gi-docgen perl
  pkg-config sassc gettext libxslt docbook-xsl python3-docutils
  $(vopt_if wayland 'wayland-devel wayland-protocols') shaderc"
 makedepends="at-spi2-atk-devel gdk-pixbuf-devel libepoxy-devel pango-devel
- iso-codes graphene-devel gst-plugins-bad1-devel cairo-devel
+ iso-codes graphene-devel cairo-devel
  $(vopt_if colord 'colord-devel') $(vopt_if cups 'cups-devel')
  $(vopt_if wayland 'libxkbcommon-devel wayland-devel wayland-protocols MesaLib-devel')
  $(vopt_if x11 'libXcursor-devel libXdamage-devel libXext-devel libXinerama-devel libXi-devel libXrandr-devel libXcomposite-devel')
  $(vopt_if cloudproviders 'libcloudproviders-devel')
  $(vopt_if vulkan 'vulkan-loader-devel')
  $(vopt_if tracker 'tinysparql-devel')"
-depends="gtk-update-icon-cache shared-mime-info $(vopt_if x11 'dbus-x11')"
+# 4.24 uses glib 2.90 / pango 1.58 symbols that older libs lack
+depends="gtk-update-icon-cache shared-mime-info glib>=2.90.0_1 pango>=1.58.0_1
+ $(vopt_if x11 'dbus-x11')"
 short_desc="GIMP ToolKit (v4)"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="LGPL-2.1-or-later"
@@ -41,7 +44,9 @@ build_options="broadway cloudproviders colord cups gir vulkan wayland x11 tracke
 desc_option_broadway="Enable support for the HTML5 Broadway backend"
 desc_option_cloudproviders="Enable integration with cloudproviders, such as Nextcloud"
 
-build_options_default="broadway cloudproviders colord cups gir vulkan wayland x11 tracker"
+# voidlab: no GStreamer media backend (pulls gst-plugins-bad1, flite, ffmpeg libs), and
+# broadway/cloudproviders/colord off by default to keep the dependency set small
+build_options_default="cups gir vulkan wayland x11 tracker"
 
 pre_build() {
 	# help gi-docgen find gi files on cross

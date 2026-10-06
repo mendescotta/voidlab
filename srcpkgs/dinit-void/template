@@ -1,27 +1,42 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
-version=0.1
-revision=4
-# Void glue for dinit-chimera: device/console helpers, the power commands
-# (/usr/bin/init itself is dinit-chimera's env-cleaning wrapper), and base services (gettys, dhcpcd, sshd, dbus, elogind,
-# polkitd, NetworkManager, display managers, chronyd). dbus-wait-for is q66's D-Bus readiness helper (BSD-2-Clause).
+version=0.99.25
+revision=1
+# Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
+# device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
+# dbus, elogind, polkitd, NetworkManager, display managers, chronyd).
+# /usr/bin/init is dinit-chimera's env-cleaning wrapper. dbus-wait-for is q66's
+# D-Bus readiness helper (BSD-2-Clause).
+build_style=meson
+configure_args="-Ddefault-path-env=/usr/bin"
 hostmakedepends="pkg-config"
-makedepends="dbus-devel"
-depends="dinit dinit-chimera eudev kbd util-linux"
-short_desc="Void Linux integration for dinit-chimera"
+makedepends="libkmod-devel dbus-devel"
+depends="dinit sd-tools kmod eudev kbd util-linux"
+# service enablement dirs (the boot/system targets' waits-for.d); tmpfiles
+# only creates them at boot, too late for tools that enable services offline
+make_dirs="
+ /etc/dinit.d/boot.d 0755 root root
+ /usr/lib/dinit.d/boot.d 0755 root root"
+short_desc="dinit-chimera early-boot services with Void Linux integration"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause"
-homepage="https://github.com/mendescotta"
-# owns /usr/bin/{shutdown,halt,poweroff,reboot} like runit-void does
+homepage="https://github.com/chimera-linux/dinit-chimera"
+distfiles="https://github.com/chimera-linux/dinit-chimera/archive/v${version}.tar.gz"
+checksum=777dbee5a69f96a1a4cd812c7fa3dce62a7247a4be99420832a778e548c357f7
+# replaces the former separate dinit-chimera package
+replaces="dinit-chimera>=0"
+# ships /usr/bin/init and owns /usr/bin/{shutdown,halt,poweroff,reboot} like runit-void
 conflicts="runit-void>=0"
 
-do_build() {
+post_build() {
 	${CC} ${CFLAGS} ${LDFLAGS} -o dbus-wait-for ${FILESDIR}/dbus-wait-for.c \
 		$(pkg-config --cflags --libs dbus-1)
 }
 
-do_install() {
-	vlicense ${FILESDIR}/COPYING.dinit-glue COPYING
+post_install() {
+	vlicense COPYING.md
+	vlicense ${FILESDIR}/COPYING.dinit-glue COPYING.dinit-glue
+
 	vinstall dbus-wait-for 755 usr/libexec
 	vinstall ${FILESDIR}/dinit-dbus 755 usr/libexec
 	vinstall ${FILESDIR}/dinit-dm 755 usr/libexec

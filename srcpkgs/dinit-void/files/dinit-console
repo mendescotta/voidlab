@@ -1,5 +1,5 @@
 #!/bin/sh
-# dinit-chimera console hook: keymap and font from Void's /etc/rc.conf.
+# dinit-void console hook: keymap and font from Void's /etc/rc.conf.
 # Called as "dinit-console keyboard" or "dinit-console console".
 
 [ -r /etc/rc.conf ] && . /etc/rc.conf
