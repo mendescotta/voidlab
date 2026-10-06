@@ -1,0 +1,92 @@
+# Template file for 'otto'
+pkgname=otto
+_commit=b21fe06f88bebff88221c195b63eb417485a1e36
+_icons=2026-09-10
+version=1.6.0.20261006
+revision=1
+archs="x86_64*"
+create_wrksrc=yes
+build_wrksrc="otto-${_commit}"
+build_style=cargo
+configure_args="-p otto -p otto-bar -p otto-islands -p otto-lock -p otto-authorize -p otto-greeter
+ -p xdg-desktop-portal-otto -p otto-rdp -p otto-settings -p otto-files -p otto-launcher
+ -p otto-emoji -p otto-stash -p otto-canvas -p otto-peek -p otto-preview
+ -p otto-media-kit -p otto-msg -p otto-search -p otto-agents"
+hostmakedepends="pkg-config clang curl"
+makedepends="eudev-libudev-devel libseat-devel libxkbcommon-devel libinput-devel
+ pixman-devel libgbm-devel libdisplay-info-devel MesaLib-devel libglvnd-devel
+ wayland-devel libxcb-devel dbus-devel pipewire-devel freetype-devel
+ fontconfig-devel gstreamer1-devel gst-plugins-base1-devel vulkan-loader-devel
+ pam-devel libevdev-devel gtk4-devel polkit-devel glib-devel zlib-devel"
+depends="dbus elogind polkit pipewire wireplumber xorg-server-xwayland font-inter
+ noto-fonts-ttf gst-plugins-base1 gst-plugins-good1"
+short_desc="Visually-focused Wayland desktop with smooth animations and gestures"
+maintainer="gui <mendescotta@gmail.com>"
+license="MIT, GPL-3.0-or-later"
+homepage="https://github.com/nongio/otto"
+distfiles="https://github.com/nongio/otto/archive/${_commit}.tar.gz
+ https://codeload.github.com/vinceliuice/MacTahoe-icon-theme/tar.gz/refs/tags/${_icons}>MacTahoe-icon-theme-${_icons}.tar.gz"
+checksum="a42cfc43c15608ee771ffa5588c220c2d1e1f58a0bba803ffc8aad71f89581b6
+ 6330369e9e10a28cfc8da598ebf63a7204be705403519963ff84e1cb84719d35"
+
+do_install() {
+	local bin t
+
+	for bin in otto otto-bar otto-islands otto-lock otto-authorize otto-greeter \
+		otto-rdp otto-settings otto-files otto-launcher otto-emoji otto-stash \
+		otto-canvas otto-peek otto-preview otto-msg otto-search otto-agents \
+		otto-media-worker; do
+		vbin target/${XBPS_RUST_TARGET}/release/${bin}
+	done
+	ln -s otto-launcher ${DESTDIR}/usr/bin/otto-ask
+	vbin resources/bin/otto-look
+	vinstall target/${XBPS_RUST_TARGET}/release/xdg-desktop-portal-otto 755 usr/libexec
+
+	vinstall resources/polkit/org.otto.settings.policy 644 usr/share/polkit-1/actions
+	vinstall otto_config.example.toml 644 etc/otto config.toml
+	vinstall otto_config.example.toml 644 etc/otto config.example.toml
+	vinstall components/otto-lock/otto-lock.pam 644 etc/pam.d otto-lock
+
+	vinstall resources/otto.desktop 644 usr/share/wayland-sessions
+	for t in otto-files otto-trash otto-settings otto-preview; do
+		vinstall resources/${t}.desktop 644 usr/share/applications
+	done
+	for t in 16 24 32 48 64 128 256 512; do
+		vinstall components/otto-files/resources/icons/hicolor/${t}x${t}/apps/otto-files.png \
+			644 usr/share/icons/hicolor/${t}x${t}/apps
+	done
+	vinstall components/otto-files/resources/icons/hicolor/scalable/apps/otto-files.svg \
+		644 usr/share/icons/hicolor/scalable/apps
+	vinstall resources/wallpaper.jpg 644 usr/share/otto
+
+	vinstall components/xdg-desktop-portal-otto/otto.portal 644 usr/share/xdg-desktop-portal/portals
+	vinstall components/xdg-desktop-portal-otto/org.freedesktop.impl.portal.desktop.otto.service \
+		644 usr/share/dbus-1/services
+	# no systemd user units on Void: let dbus-daemon use Exec= directly
+	sed -i '/^SystemdService=/d' \
+		${DESTDIR}/usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.otto.service
+	vdoc components/xdg-desktop-portal-otto/portals.conf.example
+	vdoc README.md
+	vlicense LICENSE
+
+	vmkdir usr/share/otto
+	vcopy resources/plugins/otto usr/share/otto/plugins
+	vcopy resources/widgets usr/share/otto/widgets
+
+	# default icon theme: MacTahoe installed as Otto-MacTahoe (see
+	# scripts/packaging/fetch-icon-theme.sh)
+	local src=${wrksrc}/MacTahoe-icon-theme-${_icons} tmp=${wrksrc}/icon-tmp
+	mkdir -p ${tmp}/bin ${tmp}/home ${tmp}/out
+	printf '#!/bin/sh\nexit 0\n' > ${tmp}/bin/gtk-update-icon-cache
+	chmod 755 ${tmp}/bin/gtk-update-icon-cache
+	(cd ${src} && env -i PATH="${tmp}/bin:/usr/bin:/bin" HOME="${tmp}/home" \
+		bash install.sh -n Otto-MacTahoe -d ${tmp}/out) >/dev/null
+	for t in Otto-MacTahoe Otto-MacTahoe-light Otto-MacTahoe-dark; do
+		rm -f ${tmp}/out/${t}/icon-theme.cache
+		sed -i "s/^Name=.*/Name=${t}/" ${tmp}/out/${t}/index.theme
+	done
+	vmkdir usr/share/icons
+	cp -a ${tmp}/out/Otto-MacTahoe ${tmp}/out/Otto-MacTahoe-light \
+		${tmp}/out/Otto-MacTahoe-dark ${DESTDIR}/usr/share/icons/
+	vlicense ${src}/COPYING MacTahoe-COPYING
+}
