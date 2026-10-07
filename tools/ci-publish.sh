@@ -139,8 +139,8 @@ verify_metadata() {
 		for key in provides replaces reverts conflicts alternatives; do
 			while IFS= read -r v; do
 				[ -n "$v" ] || continue
-				# xbps-src adds pc:NAME-VERSION for every .pc file; accept only the owner's own name at its own version
-				if [ "$key" = provides ] && [[ $v =~ ^pc:(lib)?${pcstem}(-[0-9][0-9.]*)?-${vr//./\\.}$ ]]; then continue; fi
+				# xbps-src adds pc:NAME-VERSION and cmd:NAME-VERSION for the files it installs; accept only the owner's own name at its own version
+				if [ "$key" = provides ] && [[ $v =~ ^(pc|cmd):(lib)?${pcstem}(-[0-9][0-9.]*)?-${vr//./\\.}$ ]]; then continue; fi
 				declared "$owner" "$key" "${VERREV[$owner]%_*}" "${VERREV[$owner]##*_}" | grep -qxF -- "$v" ||
 					die "$b declares $key $v, which the template of $owner does not"
 			done < <(meta "$key")

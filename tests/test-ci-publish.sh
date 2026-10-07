@@ -152,6 +152,11 @@ fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "pc:glib-2.
 aborted "package that provides another package's pkg-config module" "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "pc:a-9.9_1"
 aborted "pkg-config provide at a version that is not the package's" "declares provides"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "cmd:ls-1.1_1"
+aborted "package that provides another package's command" "declares provides"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "cmd:a-1.1_1"
+out=$(run) && rc=0 || rc=$?
+assert_eq   "xbps-src's automatic own cmd: provide is accepted" "$rc" "0"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "pc:a-1.1_1"
 out=$(run) && rc=0 || rc=$?
 assert_eq   "xbps-src's automatic own pc: provide is accepted" "$rc" "0"
