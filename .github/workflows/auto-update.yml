@@ -1,0 +1,107 @@
+name: auto-update
+
+# Detect new stable upstream releases for the templates in tools/auto-update.allow, bump, build and
+# test them, merge one PR per passing bump and publish. Runs on a schedule or by hand; never on
+# pull_request or any fork-driven trigger.
+#
+# Two jobs on purpose. `build` runs third-party build scripts, so it is read-only: no secrets, a
+# read-only token and no persisted git credentials. It hands over plain data as an artifact.
+# `publish` runs on a fresh runner from the trusted checkout only, treats the artifact as untrusted
+# data (tools/ci-publish.sh validates it before anything is pushed or signed) and is the only job
+# with a write token and the signing key.
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      pkg:
+        description: "Only this package (overlay template name); ignores the allowlist"
+        required: false
+        type: string
+
+# one run at a time: it rewrites the whole release
+concurrency:
+  group: voidlab-release
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    permissions:
+      contents: read
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:latest
+      # xbps-src builds in a chroot, which needs the privileges
+      options: --privileged
+      volumes:
+        - /dev:/dev
+    steps:
+      - name: Install git
+        run: |
+          mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
+          sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
+          xbps-install -Syu xbps && xbps-install -y git
+
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Prepare container
+        run: sh tools/ci-prepare.sh
+
+      - name: Bump, build, test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VOIDLAB_GH_REPO: ${{ github.repository }}
+          INPUT_PKG: ${{ inputs.pkg }}
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          sudo -Eu builder env HOME=/home/builder bash tools/ci-build.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: build-out
+          path: out
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:latest
+    steps:
+      - name: Install git
+        run: |
+          mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
+          sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
+          xbps-install -Syu xbps && xbps-install -y git
+
+      - uses: actions/checkout@v5
+
+      - name: Prepare container
+        run: sh tools/ci-prepare.sh
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: build-out
+          path: ${{ runner.temp }}/build-out
+
+      - name: Validate, merge, publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VOIDLAB_GH_REPO: ${{ github.repository }}
+          VOIDLAB_PRIVKEY: ${{ secrets.VOIDLAB_PRIVKEY }}
+          VOIDLAB_KEY: /tmp/voidlab-key.pem
+          BUILD_OUT: ${{ runner.temp }}/build-out
+          INPUT_PKG: ${{ inputs.pkg }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash tools/ci-publish.sh

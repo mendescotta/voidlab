@@ -1,0 +1,46 @@
+name: overlay-report
+
+# Weekly: one issue listing overlay templates official Void has caught up with, and newer upstream
+# releases that are not on the auto-update allowlist. Read-only apart from that issue.
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: overlay-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:latest
+      options: --privileged
+      volumes:
+        - /dev:/dev
+    steps:
+      - name: Install git
+        run: |
+          mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
+          sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
+          xbps-install -Syu xbps && xbps-install -y git
+
+      - uses: actions/checkout@v5
+
+      - name: Prepare container
+        run: sh tools/ci-prepare.sh
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VOIDLAB_GH_REPO: ${{ github.repository }}
+          VOIDLAB_NO_BOOTSTRAP: "1"
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          sudo -Eu builder env HOME=/home/builder bash tools/ci-overlay-report.sh

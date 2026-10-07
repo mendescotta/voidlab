@@ -30,3 +30,35 @@ Custom templates live in `srcpkgs/`. Templates kept in a sibling
 `voidlands` checkout (`../voidlands`, or `$VOIDLAB_EXTRA_SRCPKGS`;
 currently `chimerautils`) are overlaid and built the same way. To use the local build on the same
 machine instead of the release, set `repository=/path/to/voidlab/repo`.
+
+## Automatic updates
+
+`.github/workflows/auto-update.yml` runs daily (and by hand, optionally for one package) in two jobs.
+The read-only `build` job (no secrets, read-only token, no persisted git credentials, because it runs
+third-party build scripts) takes every template in `tools/auto-update.allow`, asks `xbps-src
+update-check` for the newest **stable** upstream release (pre-releases and anything that is not a
+plain version string are ignored), bumps the template, builds and tests it, and hands plain data to
+the `publish` job as an artifact. `publish` runs on a fresh runner from the trusted checkout, treats
+that artifact as untrusted data (`tools/ci-publish.sh` aborts the whole run unless it has the expected
+shape: only the version, revision and checksum lines of a template may change, and only the
+package's own declared subpackages at the expected version may be published), merges one PR per
+passing bump (`<pkg> <version>`) and publishes. It is the only job with a write token and the
+signing key. A failing package opens or updates one `auto-update failed: <pkg>` issue and never blocks
+the others. Libraries and stack packages are not on the allowlist: bump those by hand.
+`.github/workflows/overlay-report.yml` opens one weekly `Overlay report` issue with the templates
+official Void has caught up with (add the ones that must stay to `tools/keep-overlay.list`) and the
+newer upstream releases that are not auto-updated.
+
+The steps are ordinary subcommands, so CI and a laptop behave the same:
+
+```sh
+./voidlab update --check     # TSV: bump | current | unpublished | fail (allowlist; --all for every template)
+./voidlab update <pkg>       # bump the template (version, revision=1, checksum)
+./voidlab test <pkg>...      # built version matches the template, dependencies and sonames resolve
+./voidlab redundant          # overlay templates at or behind official Void, minus the keep list
+./voidlab pull               # CI only: seed repo/ from the release (it would restore removed packages)
+```
+
+One-time setup the workflows cannot do themselves: add the repository secret `VOIDLAB_PRIVKEY`
+(the contents of `~/.config/voidlab/privkey.pem`) and allow Actions to create and approve pull
+requests (Settings, Actions, General). nvidia is never on the allowlist and is never published.
