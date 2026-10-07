@@ -7,6 +7,8 @@ HOSTDIR=$ROOT/hostdir
 MASTERDIR=$ROOT/masterdir
 REPO=$ROOT/repo
 DIST=$ROOT/dist
+# Template folders kept in sibling repos (init-diversity); one dir with a `template` each.
+EXTRA_SRCPKGS=${VOIDLAB_EXTRA_SRCPKGS:-$ROOT/../init-diversity}
 KEY=${VOIDLAB_KEY:-$HOME/.config/voidlab/privkey.pem}
 GH_REPO=${VOIDLAB_GH_REPO:-mendescotta/voidlab}
 RELEASE_TAG=${VOIDLAB_RELEASE_TAG:-repo}
@@ -49,8 +51,10 @@ cmd_overlay() {
 			[ -n "$p" ] && rm -rf "${UP:?}/srcpkgs/$p"
 		done < "$ROOT/common/removed-srcpkgs"
 	fi
-	for e in "$ROOT"/srcpkgs/*; do
+	for e in "$ROOT"/srcpkgs/* "$EXTRA_SRCPKGS"/*/; do
 		[ -e "$e" ] || [ -L "$e" ] || continue
+		e=${e%/}
+		case $e in "$ROOT"/srcpkgs/*) ;; *) [ -f "$e/template" ] || continue ;; esac
 		name=${e##*/}
 		rm -rf "${UP:?}/srcpkgs/$name"
 		if [ -L "$e" ]; then cp -P "$e" "$UP/srcpkgs/$name"; else cp -a "$e" "$UP/srcpkgs/$name"; fi
@@ -124,9 +128,10 @@ cmd_status() {
 	trap 'rm -rf "$pristine"' RETURN
 	local e p ours theirs verdict rc built
 	printf '%-30s %-22s %-22s %-12s %s\n' PACKAGE OURS UPSTREAM VERDICT REPO
-	for e in "$ROOT"/srcpkgs/*; do
+	for e in "$ROOT"/srcpkgs/* "$EXTRA_SRCPKGS"/*/; do
+		e=${e%/}
 		[ -L "$e" ] && continue
-		[ -d "$e" ] || continue
+		[ -f "$e/template" ] || continue
 		p=${e##*/}
 		if ! ours=$(tmpl_ver "$e/template"); then
 			printf '%-30s %-22s %-22s %s\n' "$p" "?" "-" "unparseable"

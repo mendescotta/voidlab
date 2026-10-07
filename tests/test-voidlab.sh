@@ -26,8 +26,12 @@ assert_grep "build without upstream says run sync" 'voidlab sync' <(echo "$out")
 VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null
 assert_file "sync clones upstream" "$R/.upstream/srcpkgs/a/template"
 
+mkdir -p "$T/init-diversity/x" "$T/init-diversity/notpkg"
+tmpl x 1.0 1 > "$T/init-diversity/x/template"
 "$R/voidlab" overlay
 UP=$R/.upstream
+assert_file "overlay adds sibling-repo package x" "$UP/srcpkgs/x/template"
+assert_no   "overlay skips sibling dirs without a template" "$UP/srcpkgs/notpkg"
 assert_grep "overlay replaces a" 'version=2.0' "$UP/srcpkgs/a/template"
 assert_file "overlay adds new package n" "$UP/srcpkgs/n/template"
 assert_eq  "overlay copies symlink n-devel" "$(readlink "$UP/srcpkgs/n-devel")" "n"

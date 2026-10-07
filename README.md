@@ -26,5 +26,7 @@ are newer.
 ./voidlab publish           # sign and upload repo/ to the `repo` release
 ```
 
-Custom templates live in `srcpkgs/`. To use the local build on the same
+Custom templates live in `srcpkgs/`. Templates kept in a sibling
+`init-diversity` checkout (`../init-diversity`, or `$VOIDLAB_EXTRA_SRCPKGS`;
+currently `chimerautils`) are overlaid and built the same way. To use the local build on the same
 machine instead of the release, set `repository=/path/to/voidlab/repo`.
