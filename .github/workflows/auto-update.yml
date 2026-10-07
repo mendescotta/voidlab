@@ -45,7 +45,7 @@ jobs:
           sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
           xbps-install -Syu xbps && xbps-install -y git
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -85,7 +85,7 @@ jobs:
           sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
           xbps-install -Syu xbps && xbps-install -y git
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Prepare container
         run: sh tools/ci-prepare.sh
