@@ -1,0 +1,7 @@
+# Wi-Fi supplicant for non-NetworkManager setups (NetworkManager starts its own through D-Bus)
+type = process
+command = /usr/bin/wpa_supplicant -M -c /etc/wpa_supplicant/wpa_supplicant.conf
+smooth-recovery = true
+depends-on: pre-network.target
+depends-on: local.target
+before: network.target

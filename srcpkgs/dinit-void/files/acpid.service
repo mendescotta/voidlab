@@ -1,0 +1,5 @@
+# ACPI event daemon
+type = process
+command = /usr/bin/acpid -f -l
+smooth-recovery = true
+depends-on: local.target

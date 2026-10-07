@@ -1,10 +1,10 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.99.25
-revision=4
+revision=5
 # Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
 # device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
-# dbus, elogind, polkitd, NetworkManager, display managers, chronyd).
+# dbus, elogind, polkitd, NetworkManager, wpa_supplicant, acpid, display managers, chronyd).
 # /usr/bin/init is dinit-chimera's env-cleaning wrapper. dbus-wait-for is q66's
 # D-Bus readiness helper (BSD-2-Clause).
 build_style=meson
@@ -70,7 +70,7 @@ EOF2
 	for c in dhcpcd sshd ssh-keygen dbus elogind polkitd NetworkManager \
 		lightdm gdm sddm cosmic-greeter-daemon cosmic-greeter chronyd \
 		vmtoolsd vmware-vmblock-fuse vboxservice spice-vdagentd \
-		power-profiles-daemon switcheroo-control; do
+		power-profiles-daemon switcheroo-control wpa_supplicant acpid; do
 		vinstall ${FILESDIR}/$c.service 644 etc/dinit.d $c
 	done
 }
