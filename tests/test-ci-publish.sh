@@ -154,6 +154,35 @@ fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provid
 aborted "package that provides a foreign soname" "shlib"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --alternatives "sudo:/usr/bin/sudo:/usr/bin/evil"
 aborted "package that registers an alternative" "alternatives"
+# substring and version-binding differentials
+fresh; good_a; printf 'bump\ta\t1.1_1\nunpublished\tc\t99.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps/c-1.0_1.noarch.xbps"; addpkg c-99.0_1
+aborted "unpublished version that is not the template's" "does not match the template"
+withnote() { # the template mentions glibc>=0 in a comment (main and artifact alike), which must not count as a declaration
+	local f
+	for f in "$T/work/srcpkgs/a/template" "$T/out/templates/a/template"; do echo '# not related to glibc>=0 or libpam.so.0' >> "$f"; done
+	(cd "$T/work" && git add -A && git commit -qm note && git push -q origin main)
+}
+fresh; good_a; withnote; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -R "glibc>=0"
+aborted "replaces value that only appears in a comment" "declares replaces"
+fresh; good_a; withnote; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libpam.so.0"
+aborted "soname that merely contains the package name" "shlib-provides"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libbar-a.so.1"
+aborted "soname that ends in the package name" "shlib-provides"
+# declared values are accepted, including the simple expansions
+fresh; good_a
+for f in "$T/work/srcpkgs/a/template" "$T/out/templates/a/template"; do
+	printf 'provides="a-compat-${version}_${revision}"\nreplaces="oldthing>=0"\n' >> "$f"
+done
+(cd "$T/work" && git add -A && git commit -qm decl && git push -q origin main)
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "a-compat-1.1_1" -R "oldthing>=0"
+out=$(run) && rc=0 || rc=$?
+assert_eq   "declared provides and replaces are accepted" "$rc" "0"
+fresh; good_a
+for f in "$T/work/srcpkgs/a/template" "$T/out/templates/a/template"; do printf 'replaces="oldthing>=0"\n' >> "$f"; done
+(cd "$T/work" && git add -A && git commit -qm decl && git push -q origin main)
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -R "oldthing>=0 glibc>=0"
+aborted "one declared and one undeclared replaces value" "declares replaces"
+
 # ... while a subpackage with a soname of its own is fine
 fresh; good_a; swap a-devel-1.1_1.noarch.xbps -A noarch -n a-devel-1.1_1 -s t --shlib-provides "liba.so.1"
 out=$(run) && rc=0 || rc=$?

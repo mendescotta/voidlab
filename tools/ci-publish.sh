@@ -66,6 +66,13 @@ while IFS= read -r line; do
 	[ -z "${STATUS[$pkg]:-}" ] || die "duplicate entry in passed.tsv: $pkg"
 	[ -f "srcpkgs/$pkg/template" ] && [ ! -L "srcpkgs/$pkg" ] || die "no template for $pkg in the repository"
 	if ! grep -qxF "$pkg" <<<"$allow" && [ "$pkg" != "${INPUT_PKG:-}" ]; then die "$pkg is not on the allowlist"; fi
+	if [ "$status" = unpublished ]; then
+		# nothing is bumped, so the build must be of the template that is on main: no other version
+		mver=$(sed -n 's/^version=//p' "srcpkgs/$pkg/template" | head -n1 | tr -d "\"'")
+		mrev=$(sed -n 's/^revision=//p' "srcpkgs/$pkg/template" | head -n1 | tr -d "\"'")
+		[[ $mver =~ ^${VER_RE}$ ]] && [[ $mrev =~ ^[0-9]+$ ]] || die "cannot read the version of $pkg from its template"
+		[ "$verrev" = "${mver}_${mrev}" ] || die "version $verrev of $pkg does not match the template (${mver}_${mrev})"
+	fi
 	STATUS[$pkg]=$status
 	VERREV[$pkg]=$verrev
 done < "$BUILD_OUT/passed.tsv"
@@ -103,10 +110,18 @@ for f in "$BUILD_OUT"/xbps/*.xbps; do
 done
 shopt -u nullglob
 
+# the words a template declares in `key="..."` (text only, nothing executed), with the simple
+# expansions applied; metadata must match these exactly, a mention in a comment or a longer word does not count
+declared() { # <pkg> <key> <version> <revision>
+	perl -0ne 'print "$1\n" if /^'"$2"'=["\x27]?([^"\x27]*)["\x27]?/m' "srcpkgs/$1/template" | tr -s ' \t\n' '\n\n\n' |
+		sed -e "s/\${pkgname}/$1/g" -e "s/\$pkgname/$1/g" -e "s/\${version}/$3/g" -e "s/\$version/$3/g" \
+			-e "s/\${revision}/$4/g" -e "s/\$revision/$4/g"
+}
+
 # --- package metadata: xbps-rindex indexes a package by what is inside it, not by its file name, so
 # index the files in a scratch repository and read the metadata back with xbps itself
 verify_metadata() {
-	local chk f b name vr arch owner key v so
+	local chk f b name vr arch owner key v so stem
 	[ ${#OWNER[@]} -gt 0 ] || return 0
 	chk=$(mktemp -d)
 	cp "$BUILD_OUT"/xbps/*.xbps "$chk"/
@@ -123,12 +138,16 @@ verify_metadata() {
 		for key in provides replaces reverts conflicts alternatives; do
 			while IFS= read -r v; do
 				[ -n "$v" ] || continue
-				grep -qF -- "$v" "srcpkgs/$owner/template" || die "$b declares $key $v, which the template of $owner does not"
+				declared "$owner" "$key" "${VERREV[$owner]%_*}" "${VERREV[$owner]##*_}" | grep -qxF -- "$v" ||
+					die "$b declares $key $v, which the template of $owner does not"
 			done < <(meta "$key")
 		done
+		# a soname is libNAME.so.N or libNAME-V.so.N where NAME is the owning package (without a lib prefix)
+		stem=$(printf '%s' "${owner#lib}" | sed 's/[.+]/\\&/g')
 		while IFS= read -r so; do
 			[ -n "$so" ] || continue
-			[[ $so == *"$owner"* || $so == *"${owner#lib}"* ]] || die "$b has shlib-provides $so, which does not belong to $owner"
+			[[ $so =~ ^lib${stem}(-[0-9][0-9.]*)?\.so(\.[0-9]+)*$ ]] ||
+				die "$b has shlib-provides $so, which does not belong to $owner"
 		done < <(meta shlib-provides)
 	done
 }
