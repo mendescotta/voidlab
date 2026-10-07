@@ -7,3 +7,6 @@ DEVNOTES.md
 dist/
 masterdir-musl/
 repo-musl/
+.release/
+.auto-update-passed
+out/

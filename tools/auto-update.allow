@@ -1,0 +1,9 @@
+# Templates `voidlab update` may bump, build, test and publish on its own.
+# Opt-in: anything not listed here is only reported. Libraries and stack packages
+# (glib, gtk4, mutter, gnome-shell) stay off this list: they need coordinated rebuilds.
+baobab
+gnote
+file-roller
+python3-xapp
+pix
+xviewer

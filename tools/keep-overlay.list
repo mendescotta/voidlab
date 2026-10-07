@@ -1,0 +1,9 @@
+# Templates kept in the overlay on purpose even when official Void has the same version
+# (for example rebuilds against our newer libraries). `voidlab redundant` skips these.
+
+# Rebuilt against our newer libraries: the official binary links different sonames
+# (checked 2026-10-07 by comparing shlib-requires of our package and Void's).
+cheese                    # libgnome-desktop-3.so.21 vs .20
+xdg-desktop-portal-gtk    # libgnome-desktop-3.so.21 vs .20
+xfce4-whiskermenu-plugin  # libaccountsservice.so.1 vs .0
+evolution-data-server     # ICU 78 vs 77, GOA disabled

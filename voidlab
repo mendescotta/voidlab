@@ -19,6 +19,13 @@ KEY=${VOIDLAB_KEY:-$HOME/.config/voidlab/privkey.pem}
 GH_REPO=${VOIDLAB_GH_REPO:-mendescotta/voidlab}
 RELEASE_TAG=${VOIDLAB_RELEASE_TAG:-repo}
 UPSTREAM_URL=${VOIDLAB_UPSTREAM_URL:-https://github.com/void-linux/void-packages}
+# Templates `update` may bump on its own; one name per line, `#` comments.
+ALLOW=${VOIDLAB_ALLOW:-$ROOT/tools/auto-update.allow}
+# Templates kept on purpose even when official Void has the same version.
+KEEP=${VOIDLAB_KEEP:-$ROOT/tools/keep-overlay.list}
+OFFICIAL_URL=${VOIDLAB_OFFICIAL_URL:-https://repo-default.voidlinux.org/current}
+# repodata of the published release, stored by `pull`, read by `update`.
+RELDIR=$ROOT/.release
 
 die()  { echo "voidlab: $*" >&2; exit 1; }
 need() { local t; for t; do command -v "$t" >/dev/null || die "missing tool: $t"; done; }
@@ -169,6 +176,215 @@ cmd_status() {
 	done
 }
 
+list_names() {
+	[ -f "$1" ] || return 0
+	sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$1" | awk 'NF'
+}
+
+# Path of the overlay template for a package name, or exit 1.
+overlay_tmpl() {
+	if [ -f "$ROOT/srcpkgs/$1/template" ] && [ ! -L "$ROOT/srcpkgs/$1" ]; then
+		echo "$ROOT/srcpkgs/$1/template"
+	elif [ -f "$EXTRA_SRCPKGS/$1/template" ]; then
+		echo "$EXTRA_SRCPKGS/$1/template"
+	else
+		return 1
+	fi
+}
+
+overlay_names() {
+	local e
+	for e in "$ROOT"/srcpkgs/* "$EXTRA_SRCPKGS"/*/; do
+		e=${e%/}
+		[ -L "$e" ] && continue
+		[ -f "$e/template" ] || continue
+		echo "${e##*/}"
+	done
+}
+
+# Upstream tag names are attacker-controlled and end up in a template that xbps-src sources as
+# shell, so a version is only ever accepted if it is plain: no quote, $, `, ;, &, /, \ or space.
+VERSION_RE='^[0-9][0-9A-Za-z.+~]*$'
+
+# stdin: `xbps-src update-check` output; prints the highest stable, plain version of $1.
+# Lines without `->` (error text), pre-releases and implausible versions are ignored.
+latest_stable() {
+	awk -v p="$1-" '$2 == "->" { v = $3; if (index(v, p) == 1) v = substr(v, length(p) + 1); print v }' |
+		{ grep -E "$VERSION_RE" || true; } |
+		{ grep -viE 'alpha|beta|rc|pre|dev|snap|nightly' || true; } | sort -V | tail -n1
+}
+
+# Published version_revision of $1 ("" when absent); exit 1 when there is no release index.
+release_ver() {
+	[ -f "$RELDIR/$ARCH-repodata" ] || return 1
+	local v
+	v=$(XBPS_ARCH=$ARCH xbps-query -i -R --repository="$RELDIR" -p pkgver "$1" 2>/dev/null || true)
+	echo "${v#"$1"-}"
+}
+
+# apply_bump <pkg> <overlay template> <new version>: set version, reset revision, regenerate
+# the checksum (xgensum runs in the upstream checkout on a copy); restore the template on failure.
+apply_bump() {
+	local p=$1 t=$2 v=$3 ut=$UP/srcpkgs/$1/template bak
+	[[ $v =~ $VERSION_RE ]] || return 1
+	bak=$(mktemp)
+	cp "$t" "$bak"
+	sed -i -e "s/^version=.*/version=$v/" -e 's/^revision=.*/revision=1/' "$t"
+	cp "$t" "$ut"
+	if [ -n "${VOIDLAB_GENSUM:-}" ]; then
+		"$VOIDLAB_GENSUM" "$ut" >/dev/null 2>&1 || { cp "$bak" "$t"; rm -f "$bak"; return 1; }
+	else
+		(cd "$UP" && XBPS_DISTDIR=$UP XBPS_MASTERDIR=$MASTERDIR xgensum -H "$HOSTDIR" -i "srcpkgs/$p/template") >/dev/null 2>&1 ||
+			{ cp "$bak" "$t"; rm -f "$bak"; return 1; }
+	fi
+	cp "$ut" "$t"
+	rm -f "$bak"
+}
+
+# update [--check] [--all] [pkg...]: TSV `status pkg ours other`, status bump|current|unpublished|fail.
+cmd_update() {
+	need xbps-uhelper
+	local check= all= p t ours cur new newer out rel rc pkgs=()
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--check) check=1 ;;
+		--all) all=1; check=1 ;;
+		-*) die "update: unknown option: $1" ;;
+		*) pkgs+=("$1") ;;
+		esac
+		shift
+	done
+	need_upstream
+	if [ ${#pkgs[@]} -eq 0 ]; then
+		if [ -n "$all" ]; then mapfile -t pkgs < <(overlay_names); else mapfile -t pkgs < <(list_names "$ALLOW"); fi
+	fi
+	cmd_overlay
+	for p in "${pkgs[@]}"; do
+		if ! t=$(overlay_tmpl "$p"); then printf 'fail\t%s\t-\tno overlay template\n' "$p"; continue; fi
+		if ! ours=$(tmpl_ver "$t"); then printf 'fail\t%s\t-\tunparseable template\n' "$p"; continue; fi
+		cur=${ours%_*}
+		if ! out=$(cd "$UP" && ./xbps-src update-check "$p" 2>&1); then
+			printf 'fail\t%s\t%s\tupdate-check failed\n' "$p" "$ours"; continue
+		fi
+		new=$(latest_stable "$p" <<<"$out")
+		if [ -n "$new" ] && ! [[ $new =~ $VERSION_RE ]]; then
+			printf 'fail\t%s\t%s\tinvalid upstream version\n' "$p" "$ours"; continue
+		fi
+		newer=
+		if [ -n "$new" ]; then
+			rc=0; xbps-uhelper cmpver "$new" "$cur" || rc=$?
+			if [ "$rc" -eq 1 ]; then newer=1; fi
+		fi
+		if [ -n "$newer" ]; then
+			printf 'bump\t%s\t%s\t%s\n' "$p" "$ours" "$new"
+			if [ -z "$check" ] && ! apply_bump "$p" "$t" "$new"; then
+				printf 'fail\t%s\t%s\tchecksum regeneration failed\n' "$p" "$ours"
+			fi
+			continue
+		fi
+		if rel=$(release_ver "$p"); then
+			rc=1
+			[ -z "$rel" ] || { rc=0; xbps-uhelper cmpver "$ours" "$rel" || rc=$?; }
+			if [ "$rc" -eq 1 ]; then printf 'unpublished\t%s\t%s\t%s\n' "$p" "$ours" "${rel:--}"; continue; fi
+		fi
+		printf 'current\t%s\t%s\t-\n' "$p" "$ours"
+	done
+}
+
+# test <pkg>...: the built package matches its template and installs (dry run) from repo/ + official Void.
+cmd_test() {
+	[ $# -gt 0 ] || die "usage: voidlab test <pkg>..."
+	need xbps-install xbps-query xlint
+	local p t ver built lint root rc=0 xi
+	root=$(mktemp -d)
+	trap 'rm -rf "$root"' RETURN
+	mkdir -p "$root/conf" "$root/rootfs/var/db/xbps/keys"
+	echo 'bestmatching=true' > "$root/conf/00-voidlab.conf"
+	cp /var/db/xbps/keys/*.plist "$root/rootfs/var/db/xbps/keys/" 2>/dev/null || true
+	# -n skips the index sync, and a remote repo is invisible until it is synced
+	xi=(-C "$root/conf" -r "$root/rootfs" --repository="$REPO" --repository="$OFFICIAL_URL")
+	# -y does not answer the "import this public key?" prompt, so answer it on stdin
+	printf 'y\n' | XBPS_ARCH=$ARCH xbps-install -S -y "${xi[@]}" > "$root/sync.log" 2>&1 ||
+		die "test: cannot sync repositories: $(tail -n 3 "$root/sync.log" | tr '\n' ' ')"
+	for p; do
+		if ! t=$(overlay_tmpl "$p"); then echo "FAIL $p: no overlay template"; rc=1; continue; fi
+		if ! ver=$(tmpl_ver "$t"); then echo "FAIL $p: unparseable template"; rc=1; continue; fi
+		built=$(XBPS_ARCH=$ARCH xbps-query -i -R --repository="$REPO" -p pkgver "$p" 2>/dev/null || true)
+		built=${built#"$p"-}
+		if [ -z "$built" ]; then echo "FAIL $p: not built"; rc=1; continue; fi
+		if [ "$built" != "$ver" ]; then echo "FAIL $p: built $built, template says $ver"; rc=1; continue; fi
+		lint=$(xlint "$t" 2>&1 || true)
+		[ -z "$lint" ] || printf 'warn %s: xlint\n%s\n' "$p" "$lint"
+		if XBPS_ARCH=$ARCH xbps-install -n -y "${xi[@]}" "$p" > "$root/log" 2>&1; then
+			echo "ok $p"
+		else
+			echo "FAIL $p: dry-run install failed: $(tail -n 3 "$root/log" | tr '\n' ' ')"
+			rc=1
+		fi
+	done
+	return "$rc"
+}
+
+# pull: seed repo/ with the published release (so `publish` does not delete what we did not build)
+# and keep its repodata in .release/ for `update`'s unpublished check.
+cmd_pull() {
+	need gh xbps-rindex
+	[ "$ARCH" = x86_64 ] || die "pull is glibc-only (VOIDLAB_ARCH=$ARCH)"
+	local tmp f n new=()
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' RETURN
+	gh release download "$RELEASE_TAG" -R "$GH_REPO" -D "$tmp" --pattern '*.xbps' --pattern '*-repodata' --clobber ||
+		die "pull: cannot download release $RELEASE_TAG of $GH_REPO"
+	[ -f "$tmp/x86_64-repodata" ] || die "pull: release $RELEASE_TAG has no x86_64-repodata"
+	mkdir -p "$REPO" "$RELDIR"
+	cp "$tmp/x86_64-repodata" "$RELDIR/"
+	shopt -s nullglob
+	for f in "$tmp"/*.xbps; do
+		n=${f##*/}
+		[ -e "$REPO/$n" ] && continue
+		cp "$f" "$REPO/"
+		new+=("$REPO/$n")
+	done
+	shopt -u nullglob
+	if [ ${#new[@]} -gt 0 ]; then
+		XBPS_ARCH=$ARCH xbps-rindex -f -a "${new[@]}" >/dev/null
+		XBPS_ARCH=$ARCH xbps-rindex -r "$REPO" >/dev/null
+	fi
+	echo "=> pulled ${#new[@]} packages"
+}
+
+# redundant: overlay templates at the same version as, or behind, official Void (prefer official),
+# minus tools/keep-overlay.list. TSV `verdict pkg ours official`; verdict identical|revbump|same-ver|behind.
+cmd_redundant() {
+	need_upstream
+	need xbps-uhelper
+	local pristine p t e ours theirs rc verdict keep
+	pristine=$(mktemp -d)
+	trap 'rm -rf "$pristine"' RETURN
+	keep=$(list_names "$KEEP")
+	while IFS= read -r p; do
+		if grep -qxF "$p" <<<"$keep"; then continue; fi
+		t=$(overlay_tmpl "$p")
+		e=${t%/template}
+		ours=$(tmpl_ver "$t") || continue
+		git -C "$UP" cat-file -e "HEAD:srcpkgs/$p/template" 2>/dev/null || continue
+		theirs=$(git -C "$UP" show "HEAD:srcpkgs/$p/template" | tmpl_ver -) || continue
+		rc=0; xbps-uhelper cmpver "${ours%_*}" "${theirs%_*}" || rc=$?
+		case $rc in
+		1) continue ;;
+		255) printf 'behind\t%s\t%s\t%s\n' "$p" "$ours" "$theirs"; continue ;;
+		esac
+		rm -rf "${pristine:?}/srcpkgs"
+		git -C "$UP" archive HEAD "srcpkgs/$p" | tar -x -C "$pristine"
+		if diff -rq -I '^revision=' "$e" "$pristine/srcpkgs/$p" >/dev/null 2>&1; then
+			if [ "$ours" = "$theirs" ]; then verdict=identical; else verdict=revbump; fi
+		else
+			verdict=same-ver
+		fi
+		printf '%s\t%s\t%s\t%s\n' "$verdict" "$p" "$ours" "$theirs"
+	done < <(overlay_names)
+}
+
 cmd_keygen() {
 	need openssl
 	[ ! -e "$KEY" ] || die "key already exists: $KEY"
@@ -214,5 +430,9 @@ build)   shift; cmd_build "$@" ;;
 status)  shift; cmd_status "$@" ;;
 keygen)  shift; cmd_keygen "$@" ;;
 publish) shift; cmd_publish "$@" ;;
-*) echo "usage: voidlab {sync|overlay|build <pkg>...|status|keygen|publish}" >&2; exit 2 ;;
+update)  shift; cmd_update "$@" ;;
+test)    shift; cmd_test "$@" ;;
+pull)    shift; cmd_pull "$@" ;;
+redundant) shift; cmd_redundant "$@" ;;
+*) echo "usage: voidlab {sync|overlay|build <pkg>...|status|update|test <pkg>...|pull|redundant|keygen|publish}" >&2; exit 2 ;;
 esac
