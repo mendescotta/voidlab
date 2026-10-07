@@ -4,11 +4,11 @@ version=6.5
 revision=1
 create_wrksrc=yes
 # Upstream's prebuilt release: building from source needs dart-sass (not in Void)
-distfiles="https://github.com/lassekongo83/adw-gtk3/releases/download/v${version}/adw-gtk3v${version}.tar.xz"
 short_desc="GTK3 theme that ports libadwaita's look (adw-gtk3 and adw-gtk3-dark)"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="LGPL-2.1-only"
 homepage="https://github.com/lassekongo83/adw-gtk3"
+distfiles="https://github.com/lassekongo83/adw-gtk3/releases/download/v${version}/adw-gtk3v${version}.tar.xz"
 checksum=a81780fadfc432be0fc3d89c4ebb41aa28e4f032d42c36f9789c57dd10cfa41c
 
 do_install() {
