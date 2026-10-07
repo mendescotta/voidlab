@@ -89,6 +89,11 @@ cmd_sync() {
 	else
 		git clone -q --depth 1 "$UPSTREAM_URL" "$UP"
 	fi
+	# `clean -fdx` drops etc/conf; CI sets this because unprivileged user namespaces are blocked there
+	if [ -n "${VOIDLAB_CHROOT_CMD:-}" ]; then
+		mkdir -p "$UP/etc"
+		echo "XBPS_CHROOT_CMD=$VOIDLAB_CHROOT_CMD" > "$UP/etc/conf"
+	fi
 	if [ -z "${VOIDLAB_NO_BOOTSTRAP:-}" ] && [ ! -d "$MASTERDIR" ]; then
 		xsrc binary-bootstrap
 	fi

@@ -25,6 +25,11 @@ assert_grep "build without upstream says run sync" 'voidlab sync' <(echo "$out")
 
 VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null
 assert_file "sync clones upstream" "$R/.upstream/srcpkgs/a/template"
+assert_eq "sync leaves the chroot method alone by default" "$(cat "$R/.upstream/etc/conf" 2>/dev/null | grep -c CHROOT_CMD || true)" "0"
+VOIDLAB_CHROOT_CMD=uchroot VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null
+assert_grep "VOIDLAB_CHROOT_CMD selects the xbps-src chroot helper" '^XBPS_CHROOT_CMD=uchroot$' "$R/.upstream/etc/conf"
+VOIDLAB_CHROOT_CMD=uchroot VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null
+assert_eq "a second sync does not duplicate it" "$(grep -c CHROOT_CMD "$R/.upstream/etc/conf")" "1"
 
 mkdir -p "$T/voidlands/x" "$T/voidlands/notpkg"
 tmpl x 1.0 1 > "$T/voidlands/x/template"

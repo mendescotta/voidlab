@@ -57,6 +57,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VOIDLAB_GH_REPO: ${{ github.repository }}
           INPUT_PKG: ${{ inputs.pkg }}
+          VOIDLAB_CHROOT_CMD: uchroot
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE"
           sudo -Eu builder env HOME=/home/builder bash tools/ci-build.sh
