@@ -17,7 +17,7 @@ depends="dinit sd-tools kmod eudev kbd util-linux"
 make_dirs="
  /etc/dinit.d/boot.d 0755 root root
  /usr/lib/dinit.d/boot.d 0755 root root"
-short_desc="dinit-chimera early-boot services with Void Linux integration"
+short_desc="Dinit-chimera early-boot services with Void Linux integration"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause"
 homepage="https://github.com/chimera-linux/dinit-chimera"
