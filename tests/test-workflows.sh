@@ -53,5 +53,6 @@ assert_grep "publish job downloads the artifact"   'download-artifact' <(echo "$
 assert_eq "ci-build.sh pushes, opens and publishes nothing" "$(grep -cE 'git push|gh +(pr|issue|release)|"\$VL" +publish' "$ROOT/tools/ci-build.sh" || true)" "0"
 assert_eq "ci-build.sh only ever strips the signing key" "$(grep 'VOIDLAB_PRIVKEY' "$ROOT/tools/ci-build.sh" | grep -vc -- '-u VOIDLAB_PRIVKEY' || true)" "0"
 assert_eq "ci-publish.sh never executes artifact content" "$(grep -cE '(^|[[:space:];&|(])(source|\.|bash|sh|exec|eval|python3|perl) +["]?\$BUILD_OUT' "$ROOT/tools/ci-publish.sh" || true)" "0"
+assert_eq "every action is pinned to a full commit SHA" "$(grep -h 'uses:' "${files[@]}" | grep -vcE 'uses: [^@ ]+@[0-9a-f]{40}( |$)' || true)" "0"
 assert_grep "dependabot watches github-actions" 'package-ecosystem: github-actions' "$ROOT/.github/dependabot.yml"
 finish
