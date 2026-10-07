@@ -30,6 +30,8 @@ VOIDLAB_CHROOT_CMD=uchroot VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/vo
 assert_grep "VOIDLAB_CHROOT_CMD selects the xbps-src chroot helper" '^XBPS_CHROOT_CMD=uchroot$' "$R/.upstream/etc/conf"
 VOIDLAB_CHROOT_CMD=uchroot VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null
 assert_eq "a second sync does not duplicate it" "$(grep -c CHROOT_CMD "$R/.upstream/etc/conf")" "1"
+VOIDLAB_CHROOT_CMD=uchroot "$R/voidlab" overlay
+assert_grep "overlay keeps the chroot helper (it cleans the checkout)" '^XBPS_CHROOT_CMD=uchroot$' "$R/.upstream/etc/conf"
 
 mkdir -p "$T/voidlands/x" "$T/voidlands/notpkg"
 tmpl x 1.0 1 > "$T/voidlands/x/template"

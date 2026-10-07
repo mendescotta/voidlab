@@ -53,11 +53,20 @@ merge_shlibs() {
 	mv "$up.new" "$up"
 }
 
+# `clean -fdx` drops etc/conf, so sync and overlay both rewrite it. CI sets VOIDLAB_CHROOT_CMD
+# because unprivileged user namespaces are blocked there.
+write_chroot_conf() {
+	[ -n "${VOIDLAB_CHROOT_CMD:-}" ] || return 0
+	mkdir -p "$UP/etc"
+	echo "XBPS_CHROOT_CMD=$VOIDLAB_CHROOT_CMD" > "$UP/etc/conf"
+}
+
 cmd_overlay() {
 	need_upstream
 	no_running_build
 	git -C "$UP" reset -q --hard
 	git -C "$UP" clean -qfdx
+	write_chroot_conf
 	local p e name
 	if [ -f "$ROOT/common/removed-srcpkgs" ]; then
 		while read -r p; do
@@ -89,11 +98,7 @@ cmd_sync() {
 	else
 		git clone -q --depth 1 "$UPSTREAM_URL" "$UP"
 	fi
-	# `clean -fdx` drops etc/conf; CI sets this because unprivileged user namespaces are blocked there
-	if [ -n "${VOIDLAB_CHROOT_CMD:-}" ]; then
-		mkdir -p "$UP/etc"
-		echo "XBPS_CHROOT_CMD=$VOIDLAB_CHROOT_CMD" > "$UP/etc/conf"
-	fi
+	write_chroot_conf
 	if [ -z "${VOIDLAB_NO_BOOTSTRAP:-}" ] && [ ! -d "$MASTERDIR" ]; then
 		xsrc binary-bootstrap
 	fi
