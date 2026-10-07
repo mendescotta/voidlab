@@ -17,6 +17,9 @@ if [ "${GITHUB_ACTIONS:-}" != true ] && [ -z "${CI_AUTO_UPDATE_FORCE:-}" ]; then
 fi
 cd "$(dirname "$(readlink -f "$0")")/.." || exit 1
 
+# one byte-wise locale: character classes and ranges must mean the same thing everywhere
+export LC_ALL=C
+
 die() { echo "ci-publish: $*" >&2; exit 1; }
 log() { printf '=> %s\n' "$*"; }
 
@@ -48,9 +51,15 @@ done < <(find "$BUILD_OUT" -type f)
 # --- passed.tsv
 allow=$(sed -e 's/#.*//' -e 's/[[:space:]]*$//' tools/auto-update.allow 2>/dev/null | awk 'NF')
 declare -A STATUS VERREV ALLOWED
-while IFS=$'\t' read -r status pkg verrev extra; do
-	[ -n "$status$pkg$verrev$extra" ] || continue
-	[ -z "$extra" ] && [ -n "$verrev" ] || die "malformed line in passed.tsv: $status $pkg"
+# fields are split by hand: `read` with a tab IFS collapses empty fields, so a line could be accepted
+# that no other parser would read the same way
+tabs() { local t=${1//[!$'\t']/}; echo ${#t}; }
+while IFS= read -r line; do
+	[ -n "$line" ] || continue
+	[ "$(tabs "$line")" -eq 2 ] || die "malformed line in passed.tsv: $line"
+	status=${line%%$'\t'*}; rest=${line#*$'\t'}
+	pkg=${rest%%$'\t'*}; verrev=${rest#*$'\t'}
+	[ -n "$status" ] && [ -n "$pkg" ] && [ -n "$verrev" ] || die "malformed line in passed.tsv: $line"
 	[ "$status" = bump ] || [ "$status" = unpublished ] || die "unknown status in passed.tsv: $status"
 	[[ $pkg =~ $PKG_RE ]] || die "invalid package name in passed.tsv: $pkg"
 	[[ $verrev =~ $VERREV_RE ]] || die "invalid version in passed.tsv: $pkg"
@@ -94,6 +103,37 @@ for f in "$BUILD_OUT"/xbps/*.xbps; do
 done
 shopt -u nullglob
 
+# --- package metadata: xbps-rindex indexes a package by what is inside it, not by its file name, so
+# index the files in a scratch repository and read the metadata back with xbps itself
+verify_metadata() {
+	local chk f b name vr arch owner key v so
+	[ ${#OWNER[@]} -gt 0 ] || return 0
+	chk=$(mktemp -d)
+	cp "$BUILD_OUT"/xbps/*.xbps "$chk"/
+	XBPS_ARCH=x86_64 xbps-rindex -a "$chk"/*.xbps >/dev/null 2>&1 || die "a package in the build artifact cannot be indexed"
+	for f in "$chk"/*.xbps; do
+		b=${f##*/}
+		[[ $b =~ ^(.+)-(${VER_RE}_[0-9]+)\.(x86_64|noarch)\.xbps$ ]] || die "invalid package file name: $b"
+		name=${BASH_REMATCH[1]} vr=${BASH_REMATCH[2]} arch=${BASH_REMATCH[3]}
+		meta() { XBPS_ARCH=x86_64 xbps-query -i -R --repository="$chk" -p "$1" "$name" 2>/dev/null; }
+		[ "$(meta pkgver)" = "$name-$vr" ] || die "package metadata of $b does not match its file name"
+		[ "$(meta architecture)" = "$arch" ] || die "package metadata of $b does not match its file name (architecture)"
+		owner=${OWNER[$b]}
+		# anything that can change what other packages resolve to must come from the template itself
+		for key in provides replaces reverts conflicts alternatives; do
+			while IFS= read -r v; do
+				[ -n "$v" ] || continue
+				grep -qF -- "$v" "srcpkgs/$owner/template" || die "$b declares $key $v, which the template of $owner does not"
+			done < <(meta "$key")
+		done
+		while IFS= read -r so; do
+			[ -n "$so" ] || continue
+			[[ $so == *"$owner"* || $so == *"${owner#lib}"* ]] || die "$b has shlib-provides $so, which does not belong to $owner"
+		done < <(meta shlib-provides)
+	done
+}
+verify_metadata
+
 # --- templates: only the version, revision and checksum lines may change
 change_ok_re="^[<>] (version=${VER_RE}|revision=[0-9]+|checksum=\"?${HASH_RE}( ${HASH_RE})*\"?)\$"
 change_cont_re="^[<>][[:space:]]+\"?${HASH_RE}( ${HASH_RE})*\"?\$"
@@ -106,9 +146,13 @@ for pkg in "${!STATUS[@]}"; do
 	[ "${STATUS[$pkg]}" = bump ] || continue
 	a=$BUILD_OUT/templates/$pkg/template
 	[ -f "$a" ] || die "no bumped template for $pkg"
+	# diff prints "Binary files differ" and no change lines for a file with a NUL byte, and bash reads
+	# straight through NUL and CR: neither may exist, or the diff below would validate nothing
+	tr -d '\0' < "$a" | cmp -s - "$a" || die "template of $pkg contains NUL bytes"
+	if grep -q $'\r' "$a"; then die "template of $pkg contains a carriage return"; fi
 	while IFS= read -r line; do
 		[[ $line =~ $change_ok_re ]] || [[ $line =~ $change_cont_re ]] || die "template of $pkg changes more than version, revision and checksum: $line"
-	done < <(diff "srcpkgs/$pkg/template" "$a" | grep -E '^[<>]' || true)
+	done < <(diff -a "srcpkgs/$pkg/template" "$a" | grep -E '^[<>]' || true)
 	grep -qx "version=${VERREV[$pkg]%_*}" "$a" || die "template of $pkg does not carry version ${VERREV[$pkg]%_*}"
 	grep -qx 'revision=1' "$a" || die "template of $pkg does not have revision=1"
 	cmp -s "srcpkgs/$pkg/template" "$a" && die "template of $pkg is unchanged"
@@ -116,9 +160,11 @@ done
 
 # --- failures: validated now, reported later
 declare -A FAILED
-while IFS=$'\t' read -r pkg ver extra; do
-	[ -n "$pkg$ver$extra" ] || continue
-	[[ $pkg =~ $PKG_RE ]] && [[ $ver =~ ^${VER_RE}$ ]] && [ -z "$extra" ] || die "malformed line in failed.tsv: $pkg"
+while IFS= read -r line; do
+	[ -n "$line" ] || continue
+	[ "$(tabs "$line")" -eq 1 ] || die "malformed line in failed.tsv: $line"
+	pkg=${line%%$'\t'*}; ver=${line#*$'\t'}
+	[[ $pkg =~ $PKG_RE ]] && [[ $ver =~ ^${VER_RE}$ ]] || die "malformed line in failed.tsv: $line"
 	FAILED[$pkg]=$ver
 done < "$BUILD_OUT/failed.tsv"
 
