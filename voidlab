@@ -13,8 +13,8 @@ x86_64-musl) MASTERDIR=$ROOT/masterdir-musl REPO=$ROOT/repo-musl XSRC_ARCH=$ARCH
 *) echo "voidlab: unsupported VOIDLAB_ARCH: $ARCH" >&2; exit 1 ;;
 esac
 DIST=$ROOT/dist
-# Template folders kept in sibling repos (init-diversity); one dir with a `template` each.
-EXTRA_SRCPKGS=${VOIDLAB_EXTRA_SRCPKGS:-$ROOT/../init-diversity}
+# Template folders kept in sibling repos (voidlands); one dir with a `template` each.
+EXTRA_SRCPKGS=${VOIDLAB_EXTRA_SRCPKGS:-$ROOT/../voidlands}
 KEY=${VOIDLAB_KEY:-$HOME/.config/voidlab/privkey.pem}
 GH_REPO=${VOIDLAB_GH_REPO:-mendescotta/voidlab}
 RELEASE_TAG=${VOIDLAB_RELEASE_TAG:-repo}

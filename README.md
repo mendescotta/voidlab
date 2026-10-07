@@ -27,6 +27,6 @@ are newer.
 ```
 
 Custom templates live in `srcpkgs/`. Templates kept in a sibling
-`init-diversity` checkout (`../init-diversity`, or `$VOIDLAB_EXTRA_SRCPKGS`;
+`voidlands` checkout (`../voidlands`, or `$VOIDLAB_EXTRA_SRCPKGS`;
 currently `chimerautils`) are overlaid and built the same way. To use the local build on the same
 machine instead of the release, set `repository=/path/to/voidlab/repo`.
