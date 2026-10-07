@@ -121,7 +121,7 @@ declared() { # <pkg> <key> <version> <revision>
 # --- package metadata: xbps-rindex indexes a package by what is inside it, not by its file name, so
 # index the files in a scratch repository and read the metadata back with xbps itself
 verify_metadata() {
-	local chk f b name vr arch owner key v so stem
+	local chk f b name vr arch owner key v so stem pcstem
 	[ ${#OWNER[@]} -gt 0 ] || return 0
 	chk=$(mktemp -d)
 	cp "$BUILD_OUT"/xbps/*.xbps "$chk"/
@@ -134,10 +134,13 @@ verify_metadata() {
 		[ "$(meta pkgver)" = "$name-$vr" ] || die "package metadata of $b does not match its file name"
 		[ "$(meta architecture)" = "$arch" ] || die "package metadata of $b does not match its file name (architecture)"
 		owner=${OWNER[$b]}
+		pcstem=$(printf '%s' "${owner#lib}" | sed 's/[.+]/\\&/g')
 		# anything that can change what other packages resolve to must come from the template itself
 		for key in provides replaces reverts conflicts alternatives; do
 			while IFS= read -r v; do
 				[ -n "$v" ] || continue
+				# xbps-src adds pc:NAME-VERSION for every .pc file; accept only the owner's own name at its own version
+				if [ "$key" = provides ] && [[ $v =~ ^pc:(lib)?${pcstem}(-[0-9][0-9.]*)?-${vr//./\\.}$ ]]; then continue; fi
 				declared "$owner" "$key" "${VERREV[$owner]%_*}" "${VERREV[$owner]##*_}" | grep -qxF -- "$v" ||
 					die "$b declares $key $v, which the template of $owner does not"
 			done < <(meta "$key")
