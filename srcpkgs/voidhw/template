@@ -8,4 +8,4 @@ maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/voidhw"
 distfiles="https://github.com/mendescotta/voidhw/archive/refs/tags/v${version}.tar.gz"
-checksum=5afafd87c38072063e9ab008b313150e54346ee8eb8b3d54d30c4e8af739a290
+checksum=aba74f184e24ca359803a0c1042a0ae752c94a5653c5203af497bdd28d069ec0

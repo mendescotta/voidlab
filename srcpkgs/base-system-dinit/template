@@ -11,8 +11,12 @@ depends="base-files>=0.77 ncurses coreutils chimerautils findutils diffutils
  mdocml>=1.13.3 shadow e2fsprogs btrfs-progs xfsprogs f2fs-tools dosfstools
  procps-ng tzdata pciutils usbutils iana-etc openssh dhcpcd kbd iproute2
  iputils iw wpa_supplicant xbps nvi sudo wifi-firmware void-artwork
- traceroute ethtool kmod acpid eudev removed-packages glibc-locales linux
+ traceroute ethtool kmod acpid eudev removed-packages linux
  dinit dinit-void sd-tools"
+case "$XBPS_TARGET_MACHINE" in
+	*-musl) depends+=" musl" ;;
+	*) depends+=" glibc-locales" ;;
+esac
 short_desc="Void Linux base system meta package (dinit-void, chimerautils)"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="Public Domain"

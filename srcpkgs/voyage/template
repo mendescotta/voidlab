@@ -11,7 +11,7 @@ maintainer="gui <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/voyage"
 distfiles="https://github.com/mendescotta/voyage/archive/refs/tags/v${version}.tar.gz"
-checksum=b30667ef017af3a0a345137c301dd80aebddc0f51ae850f4a36d92c57ec31a37
+checksum=c59f130cd107b696a0fe4e2e5b89288931350ae87246ee2df2550fdb5174d60d
 
 do_install() {
 	vbin target/${RUST_TARGET}/release/voyage

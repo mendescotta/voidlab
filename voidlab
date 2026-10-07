@@ -4,8 +4,14 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 UP=$ROOT/.upstream
 HOSTDIR=$ROOT/hostdir
-MASTERDIR=$ROOT/masterdir
-REPO=$ROOT/repo
+# VOIDLAB_ARCH=x86_64-musl builds the musl flavour in its own masterdir and
+# repo-musl/ (local only; `publish` is glibc-only).
+ARCH=${VOIDLAB_ARCH:-x86_64}
+case $ARCH in
+x86_64) MASTERDIR=$ROOT/masterdir REPO=$ROOT/repo XSRC_ARCH= ;;
+x86_64-musl) MASTERDIR=$ROOT/masterdir-musl REPO=$ROOT/repo-musl XSRC_ARCH=$ARCH ;;
+*) echo "voidlab: unsupported VOIDLAB_ARCH: $ARCH" >&2; exit 1 ;;
+esac
 DIST=$ROOT/dist
 # Template folders kept in sibling repos (init-diversity); one dir with a `template` each.
 EXTRA_SRCPKGS=${VOIDLAB_EXTRA_SRCPKGS:-$ROOT/../init-diversity}
@@ -17,7 +23,7 @@ UPSTREAM_URL=${VOIDLAB_UPSTREAM_URL:-https://github.com/void-linux/void-packages
 die()  { echo "voidlab: $*" >&2; exit 1; }
 need() { local t; for t; do command -v "$t" >/dev/null || die "missing tool: $t"; done; }
 need_upstream() { [ -d "$UP/.git" ] || die "no upstream checkout; run: voidlab sync"; }
-xsrc() { (cd "$UP" && ./xbps-src -H "$HOSTDIR" -m "$MASTERDIR" "$@"); }
+xsrc() { (cd "$UP" && ./xbps-src ${XSRC_ARCH:+-A "$XSRC_ARCH"} -H "$HOSTDIR" -m "$MASTERDIR" "$@"); }
 no_running_build() {
 	need pgrep
 	if pgrep -x xbps-src >/dev/null; then die "another xbps-src build is running"; fi
@@ -86,13 +92,13 @@ index_repo() {
 	mkdir -p "$REPO"
 	while IFS= read -r -d '' f; do
 		cp "$f" "$REPO/"
-	done < <(find "$HOSTDIR/binpkgs" -name '*.xbps' -newer "$marker" -print0 2>/dev/null)
+	done < <(find "$HOSTDIR/binpkgs" \( -name "*.$ARCH.xbps" -o -name '*.noarch.xbps' \) -newer "$marker" -print0 2>/dev/null)
 	shopt -s nullglob
 	set -- "$REPO"/*.xbps
 	shopt -u nullglob
 	[ $# -gt 0 ] || return 0
-	xbps-rindex -f -a "$@" >/dev/null
-	xbps-rindex -r "$REPO" >/dev/null
+	XBPS_ARCH=$ARCH xbps-rindex -f -a "$@" >/dev/null
+	XBPS_ARCH=$ARCH xbps-rindex -r "$REPO" >/dev/null
 }
 
 cmd_build() {
@@ -174,6 +180,7 @@ cmd_keygen() {
 cmd_publish() {
 	need gh xbps-rindex
 	[ -f "$KEY" ] || die "no signing key at $KEY; run: voidlab keygen"
+	[ "$ARCH" = x86_64 ] || die "publish is glibc-only (VOIDLAB_ARCH=$ARCH)"
 	[ -f "$REPO/x86_64-repodata" ] || die "nothing to publish; run: voidlab build <pkg>"
 	rm -rf "$DIST"
 	mkdir -p "$DIST"

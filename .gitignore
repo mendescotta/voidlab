@@ -5,3 +5,5 @@ repo/
 .superpowers/
 DEVNOTES.md
 dist/
+masterdir-musl/
+repo-musl/
