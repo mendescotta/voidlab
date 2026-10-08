@@ -1,7 +1,7 @@
 libgdruntime.so.7 libgdruntime-16.1.0_1
 libgnarl-16.so libada-16.1.0_1
 libgnat-16.so libada-16.1.0_1
-libgnome-desktop-3.so.21 gnome-desktop-51.0_1
+libgnome-desktop-3.so.21 gnome-desktop-gtk3-51.0_3
 libgnome-qr-4.so.0 gnome-desktop-51.0_1
 libgnome-qr-gtk-4.so.0 gnome-desktop-51.0_1
 libgo.so.25 libgo-16.1.0_1
@@ -16,3 +16,7 @@ libmutter-cogl-pango-18.so.0 mutter-50.0_1
 libmutter-mtk-18.so.0 mutter-50.0_1
 libmutter-mtk-51.so.0 mutter-51.0_1
 libaccountsservice.so.1 accountsservice-26.27.3_1
+libgcr-base-3.so.1 gcr-base-3.41.2_2
+libgck-1.so.0 gcr-base-3.41.2_2
+libnma-gtk4.so.0 libnma-gtk4-1.10.6_3
+libcolord-gtk4.so.1 colord-gtk4-0.3.0_2

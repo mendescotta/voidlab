@@ -1,10 +1,11 @@
 # Template file for 'gnome-desktop'
 pkgname=gnome-desktop
 version=51.0
-revision=1
+revision=3
 build_style=meson
 build_helper="gir"
 configure_args="-Dudev=enabled -Dsystemd=disabled -Dqr=enabled
+ -Ddebug_tools=false
  -Dintrospection=$(vopt_if gir true false)"
 hostmakedepends="gettext itstool pkg-config glib-devel"
 makedepends="eudev-libudev-devel gsettings-desktop-schemas-devel gtk4-devel gtk+3-devel
@@ -22,10 +23,20 @@ checksum=9ebeb9f1769d3c310caeadd921ab34c8f264b92937740518b3bc859a579a6912
 build_options="gir"
 build_options_default="gir"
 
+gnome-desktop-gtk3_package() {
+	short_desc+=" - legacy GTK3 library"
+	depends="${sourcepkg}>=${version}_${revision}"
+	pkg_install() {
+		vmove "usr/lib/libgnome-desktop-3.so.*"
+		vmove usr/lib/girepository-1.0/GnomeDesktop-3.0.typelib
+	}
+}
+
 gnome-desktop-devel_package() {
 	depends="gtk+3-devel gsettings-desktop-schemas-devel gdk-pixbuf-devel
 	 iso-codes libX11-devel libglib-devel libseccomp-devel libxkbfile-devel
-	 xkeyboard-config eudev-libudev-devel ${sourcepkg}>=${version}_${revision}"
+	 xkeyboard-config eudev-libudev-devel ${sourcepkg}>=${version}_${revision}
+	 gnome-desktop-gtk3>=${version}_${revision}"
 	short_desc+=" - development files"
 	pkg_install() {
 		vmove usr/include

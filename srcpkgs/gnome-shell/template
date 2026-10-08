@@ -16,7 +16,8 @@ makedepends="gnome-control-center-devel at-spi2-atk-devel
  gnome-bluetooth-devel pipewire-devel gstreamer1-devel gcr4-devel elogind-devel
  cairo-devel glycin-devel librsvg-devel"
 depends="elogind gnome-control-center gsettings-desktop-schemas gnome-menus libgdm
- upower gstreamer1-pipewire gst-plugins-good1 ibus-gtk4"
+ upower gstreamer1-pipewire gst-plugins-good1 ibus-gtk4
+ libnma-gtk4"  # NMA4 typelib: hard requirement at startup, invisible to shlib detection
 checkdepends="xvfb-run mesa-dri $depends"
 short_desc="GNOME core user interface"
 maintainer="Orphaned <orphan@voidlinux.org>"

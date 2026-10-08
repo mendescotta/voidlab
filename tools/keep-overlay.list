@@ -7,3 +7,12 @@ cheese                    # libgnome-desktop-3.so.21 vs .20
 xdg-desktop-portal-gtk    # libgnome-desktop-3.so.21 vs .20
 xfce4-whiskermenu-plugin  # libaccountsservice.so.1 vs .0
 evolution-data-server     # ICU 78 vs 77, GOA disabled
+
+# gtk3-free splits for the GNOME stack:
+# same version as official Void, extra gtk-free subpackages.
+gcr                       # gcr-base
+libnma                    # libnma-gtk4, libnma-common
+colord-gtk                # colord-gtk4
+ibus                      # ibus-ui-gtk3
+gst-plugins-good1         # gst-plugins-good1-gtk3
+libdecor                  # libdecor-gtk

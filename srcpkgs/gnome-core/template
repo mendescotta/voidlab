@@ -1,7 +1,7 @@
 # Template file for 'gnome-core'
 pkgname=gnome-core
 version=51.0
-revision=4
+revision=5
 metapackage=yes
 short_desc="GNOME meta-package for Void Linux - core components"
 maintainer="Orphaned <orphan@voidlinux.org>"
@@ -19,4 +19,4 @@ depends="
  mutter>=${version}
  nautilus>=50.3.1
  xdg-desktop-portal-gnome>=${version}
- xdg-user-dirs-gtk>=0.14"
+ xdg-user-dirs"
