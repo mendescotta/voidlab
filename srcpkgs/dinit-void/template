@@ -1,7 +1,7 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.99.25
-revision=7
+revision=8
 # Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
 # device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
 # dbus, elogind, polkitd, NetworkManager, wpa_supplicant, acpid, display managers, chronyd).

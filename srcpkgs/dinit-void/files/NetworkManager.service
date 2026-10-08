@@ -1,5 +1,6 @@
 # NetworkManager
 type = process
+log-type = buffer
 command = /usr/libexec/dbus-wait-for -s -f 3 -n org.freedesktop.NetworkManager /usr/bin/NetworkManager -n
 ready-notification = pipefd:3
 smooth-recovery = true

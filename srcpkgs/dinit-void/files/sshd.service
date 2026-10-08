@@ -1,5 +1,6 @@
 # OpenSSH daemon
 type = process
+log-type = buffer
 command = /usr/bin/sshd -D
 smooth-recovery = true
 depends-on: ssh-keygen

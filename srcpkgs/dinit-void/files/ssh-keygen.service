@@ -1,4 +1,5 @@
 # generate missing ssh host keys
 type = scripted
+log-type = buffer
 command = /usr/lib/dinit/ssh-keygen
 depends-on: local.target

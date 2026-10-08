@@ -1,5 +1,6 @@
 # sddm display manager
 type = process
+log-type = buffer
 command = /usr/libexec/dinit-dm sddm /usr/bin/sddm
 smooth-recovery = true
 depends-on: dbus

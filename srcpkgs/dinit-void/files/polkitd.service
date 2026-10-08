@@ -1,5 +1,6 @@
 # PolicyKit authorization daemon
 type = process
+log-type = buffer
 command = /usr/libexec/dbus-wait-for -s -f 3 -n org.freedesktop.PolicyKit1 /usr/lib/polkit-1/polkitd --no-debug
 ready-notification = pipefd:3
 smooth-recovery = true

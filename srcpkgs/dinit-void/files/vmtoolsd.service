@@ -1,5 +1,6 @@
 # VMware guest tools
 type = process
+log-type = buffer
 command = /usr/bin/vmtoolsd
 smooth-recovery = true
 depends-on: local.target
