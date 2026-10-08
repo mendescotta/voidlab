@@ -17,4 +17,10 @@ if [ -e "$svdir" ]; then
 	/usr/bin/sv -w 15 start "$svdir" >/dev/null && exit 0
 fi
 
+# Same race under dinit: hand startup to the service instead of leaving an
+# unsupervised daemon that makes dinit's own instance exit and fail gdm.
+if [ -e /etc/dinit.d/elogind ] && [ -S /run/dinitctl ] && [ -x /usr/bin/dinitctl ]; then
+	/usr/bin/dinitctl start elogind >/dev/null && exit 0
+fi
+
 exec /usr/libexec/elogind/elogind --daemon
