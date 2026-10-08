@@ -4,7 +4,7 @@ _desc="NVIDIA drivers for linux"
 
 pkgname=nvidia
 version=615.78.08
-revision=1
+revision=2
 maintainer="Andrew Benson <abenson+void@gmail.com>"
 license="custom:NVIDIA Proprietary"
 homepage="https://www.nvidia.com/en-us/drivers/unix/"
@@ -120,7 +120,7 @@ do_install() {
 	vinstall nvidia_drv.so 755 usr/lib/xorg/modules/drivers
 
 	# firmware
-	for fw in gsp_ga10x.bin gsp_tu10x.bin; do
+	for fw in gsp_ga10x.bin gsp_tu10x.bin ucodes_ga10x.bin ucodes_tu10x.bin; do
 		vinstall "firmware/${fw}" 644 "usr/lib/firmware/nvidia/${version}"
 	done
 
