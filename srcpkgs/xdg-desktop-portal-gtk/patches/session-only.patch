@@ -1,0 +1,370 @@
+diff -ruN a/data/gtk-session.portal.in b/data/gtk-session.portal.in
+--- a/data/gtk-session.portal.in	1970-01-01 03:00:00.000000000 +0300
++++ b/data/gtk-session.portal.in	2026-10-08 14:10:19.543636980 +0300
+@@ -0,0 +1,4 @@
++[portal]
++DBusName=org.freedesktop.impl.portal.desktop.gtk
++Interfaces=org.freedesktop.impl.portal.Inhibit;org.freedesktop.impl.portal.Email;
++UseIn=gnome
+diff -ruN a/data/meson.build b/data/meson.build
+--- a/data/meson.build	2025-03-21 17:02:08.000000000 +0200
++++ b/data/meson.build	2026-10-08 14:10:19.543598031 +0300
+@@ -1,21 +1,27 @@
+ portal_dbus_interfaces = [
+   desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Request.xml',
+   desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Session.xml',
+-  desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.FileChooser.xml',
+-  desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Print.xml',
+-  desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Notification.xml',
+   desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Inhibit.xml',
+-  desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Access.xml',
+-  desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Account.xml',
+   desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Email.xml',
+-  desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.DynamicLauncher.xml',
+ ]
++if not session_only
++  portal_dbus_interfaces += [
++    desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.FileChooser.xml',
++    desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Print.xml',
++    desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Notification.xml',
++    desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Access.xml',
++    desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.Account.xml',
++    desktop_portal_interfaces_dir / 'org.freedesktop.impl.portal.DynamicLauncher.xml',
++  ]
++endif
+ 
+-fdo_dbus_interfaces = files(
+-  'org.freedesktop.ScreenSaver.xml',
+-  'org.freedesktop.Accounts.xml',
+-  'org.freedesktop.Accounts.User.xml',
+-)
++fdo_dbus_interfaces = files('org.freedesktop.ScreenSaver.xml')
++if not session_only
++  fdo_dbus_interfaces += files(
++    'org.freedesktop.Accounts.xml',
++    'org.freedesktop.Accounts.User.xml',
++  )
++endif
+ 
+ gnome_dbus_interfaces = files(
+   'org.gnome.SessionManager.xml',
+@@ -53,7 +59,7 @@
+ endif
+ 
+ configure_file(
+-  input: 'gtk.portal.in',
++  input: session_only ? 'gtk-session.portal.in' : 'gtk.portal.in',
+   output: 'gtk.portal',
+   configuration: gtk_portal,
+   install: true,
+diff -ruN a/meson.build b/meson.build
+--- a/meson.build	2025-03-21 17:02:08.000000000 +0200
++++ b/meson.build	2026-10-08 14:10:19.543374081 +0300
+@@ -54,18 +54,26 @@
+   config_h.set('HAVE_XDP_1_19_1', 1)
+ endif
+ 
++session_only = get_option('session-only')
++
+ portal_deps = [
+   xdp_dep,
+   dependency('glib-2.0', version: '>=2.44'),
+   dependency('gio-unix-2.0'),
+-  dependency('gtk+-3.0', version: '>=3.14'),
+-  dependency('gtk+-unix-print-3.0'),
+ ]
+ 
+-gtkx11_dep = dependency('gtk+-x11-3.0', required: false)
++if session_only
++  gtkx11_dep = dependency('', required: false)
++  gtkwayland_dep = dependency('', required: false)
++else
++  portal_deps += [
++    dependency('gtk+-3.0', version: '>=3.14'),
++    dependency('gtk+-unix-print-3.0'),
++  ]
++  gtkx11_dep = dependency('gtk+-x11-3.0', required: false)
++  gtkwayland_dep = dependency('gtk+-wayland-3.0', version: '>=3.21.5', required: false)
++endif
+ config_h.set('HAVE_GTK_X11', gtkx11_dep.found())
+-
+-gtkwayland_dep = dependency('gtk+-wayland-3.0', version: '>=3.21.5', required: false)
+ config_h.set('HAVE_GTK_WAYLAND', gtkwayland_dep.found())
+ 
+ configure_file(output: 'config.h', configuration: config_h)
+diff -ruN a/meson_options.txt b/meson_options.txt
+--- a/meson_options.txt	2025-03-21 17:02:08.000000000 +0200
++++ b/meson_options.txt	2026-10-08 14:10:19.542218063 +0300
+@@ -28,3 +28,7 @@
+        type: 'feature',
+        value: 'auto',
+        description: 'Enable Lockdown portal')
++option('session-only',
++       type: 'boolean',
++       value: false,
++       description: 'Build only the GTK-free Inhibit and Email portals (no GTK dependency)')
+diff -ruN a/src/email.c b/src/email.c
+--- a/src/email.c	2025-03-21 17:02:08.000000000 +0200
++++ b/src/email.c	2026-10-08 14:09:53.138902099 +0300
+@@ -9,7 +9,6 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ 
+-#include <gtk/gtk.h>
+ 
+ #include <gio/gio.h>
+ #include <gio/gdesktopappinfo.h>
+diff -ruN a/src/inhibit.c b/src/inhibit.c
+--- a/src/inhibit.c	2025-03-21 17:02:08.000000000 +0200
++++ b/src/inhibit.c	2026-10-08 14:09:53.138820371 +0300
+@@ -2,7 +2,6 @@
+ 
+ #include "config.h"
+ 
+-#include <gtk/gtk.h>
+ 
+ #include <gio/gio.h>
+ 
+diff -ruN a/src/meson.build b/src/meson.build
+--- a/src/meson.build	2025-03-21 17:02:08.000000000 +0200
++++ b/src/meson.build	2026-10-08 14:10:34.383684073 +0300
+@@ -2,24 +2,31 @@
+   'utils.c',
+   'request.c',
+   'session.c',
+-  'filechooser.c',
+-  'notification.c',
+-  'fdonotification.c',
+   'inhibit.c',
+-  'print.c',
+-  'access.c',
+-  'account.c',
+-  'accountdialog.c',
+   'email.c',
+-  'gtkbackports.c',
+-  'externalwindow.c',
+-  'dynamic-launcher.c',
+ )
+ 
+ portal_c_args = [
+   '-DLOCALEDIR="@0@"'.format(localedir),
+ ]
+ 
++if session_only
++  portal_c_args += '-DSESSION_ONLY'
++else
++  portal_sources += files(
++    'filechooser.c',
++    'notification.c',
++    'fdonotification.c',
++    'print.c',
++    'access.c',
++    'account.c',
++    'accountdialog.c',
++    'gtkbackports.c',
++    'externalwindow.c',
++    'dynamic-launcher.c',
++  )
++endif
++
+ if get_option('wallpaper').allowed()
+   portal_deps += dependency('gnome-desktop-3.0')
+   portal_sources += files(
+@@ -64,24 +71,31 @@
+   portal_sources += files('externalwindow-wayland.c')
+ endif
+ 
+-portal_resources = gnome.compile_resources(
+-  'xdg-desktop-portal-gtk-resources',
+-  'xdg-desktop-portal-gtk.gresource.xml',
+-  c_name: '_xdg_desktop',
+-  source_dir: '.',
+-)
++portal_built_sources = []
++portal_resources = []
+ 
+-portal_built_sources = [
+-  portal_resources,
+-]
++if not session_only
++  portal_resources = gnome.compile_resources(
++    'xdg-desktop-portal-gtk-resources',
++    'xdg-desktop-portal-gtk.gresource.xml',
++    c_name: '_xdg_desktop',
++    source_dir: '.',
++  )
++  portal_built_sources += portal_resources
++endif
++
++portal_annotations = []
++if not session_only
++  portal_annotations += [
++    [ 'org.freedesktop.impl.portal.Print.Print()', 'org.gtk.GDBus.C.UnixFD', 'true' ],
++  ]
++endif
+ 
+ portal_built_sources += gnome.gdbus_codegen('xdg-desktop-portal-dbus',
+   sources: portal_dbus_interfaces,
+   interface_prefix: 'org.freedesktop.impl.portal.',
+   namespace: 'XdpImpl',
+-  annotations: [
+-    [ 'org.freedesktop.impl.portal.Print.Print()', 'org.gtk.GDBus.C.UnixFD', 'true' ],
+-  ],
++  annotations: portal_annotations,
+ )
+ 
+ portal_built_sources += gnome.gdbus_codegen('shell-dbus',
+@@ -108,20 +122,22 @@
+   install_dir: libexecdir,
+ )
+ 
+-executable('testappchooser',
+-  sources: [
+-    'testappchooser.c',
+-    'appchooserrow.c',
+-    'appchooserdialog.c',
+-    portal_resources,
+-  ],
+-  dependencies: [
+-    portal_deps,
+-    gtkx11_dep,
+-  ],
+-  c_args: [
+-    '-DGETTEXT_PACKAGE="@0@"'.format(meson.project_name()),
+-    '-DLOCALEDIR="@0@"'.format(localedir),
+-  ],
+-  include_directories: [root_inc],
+-)
++if not session_only
++  executable('testappchooser',
++    sources: [
++      'testappchooser.c',
++      'appchooserrow.c',
++      'appchooserdialog.c',
++      portal_resources,
++    ],
++    dependencies: [
++      portal_deps,
++      gtkx11_dep,
++    ],
++    c_args: [
++      '-DGETTEXT_PACKAGE="@0@"'.format(meson.project_name()),
++      '-DLOCALEDIR="@0@"'.format(localedir),
++    ],
++    include_directories: [root_inc],
++  )
++endif
+diff -ruN a/src/utils.h b/src/utils.h
+--- a/src/utils.h	2025-03-21 17:02:08.000000000 +0200
++++ b/src/utils.h	2026-10-08 14:09:53.138682704 +0300
+@@ -20,7 +20,7 @@
+ 
+ #pragma once
+ 
+-#include <gdk/gdk.h>
++#include <glib.h>
+ 
+ #define DESKTOP_PORTAL_OBJECT_PATH "/org/freedesktop/portal/desktop"
+ 
+diff -ruN a/src/xdg-desktop-portal-gtk.c b/src/xdg-desktop-portal-gtk.c
+--- a/src/xdg-desktop-portal-gtk.c	2025-03-21 17:02:08.000000000 +0200
++++ b/src/xdg-desktop-portal-gtk.c	2026-10-08 14:10:49.017187252 +0300
+@@ -23,13 +23,17 @@
+ #include "config.h"
+ 
+ #include <errno.h>
++#include <stdio.h>
++#include <unistd.h>
+ #include <locale.h>
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ 
++#ifndef SESSION_ONLY
+ #include <gtk/gtk.h>
++#endif
+ 
+ #include <gio/gio.h>
+ #include <gio/gdesktopappinfo.h>
+@@ -41,19 +45,23 @@
+ #include "xdg-desktop-portal-dbus.h"
+ 
+ #include "request.h"
++#ifndef SESSION_ONLY
+ #include "filechooser.h"
++#endif
+ 
+ #ifdef BUILD_APPCHOOSER
+ #include "appchooser.h"
+ #endif
+ 
++#ifndef SESSION_ONLY
+ #include "print.h"
+ #include "dynamic-launcher.h"
+ 
+ #include "notification.h"
+-#include "inhibit.h"
+ #include "access.h"
+ #include "account.h"
++#endif
++#include "inhibit.h"
+ #include "email.h"
+ 
+ #ifdef BUILD_LOCKDOWN
+@@ -117,6 +125,7 @@
+ {
+   GError *error = NULL;
+ 
++#ifndef SESSION_ONLY
+   if (!file_chooser_init (connection, &error))
+     {
+       g_warning ("error: %s\n", error->message);
+@@ -142,6 +151,7 @@
+       g_warning ("error: %s\n", error->message);
+       g_clear_error (&error);
+     }
++#endif
+ 
+   if (!inhibit_init (connection, &error))
+     {
+@@ -149,6 +159,7 @@
+       g_clear_error (&error);
+     }
+ 
++#ifndef SESSION_ONLY
+   if (!access_init (connection, &error))
+     {
+       g_warning ("error: %s\n", error->message);
+@@ -160,6 +171,7 @@
+       g_warning ("error: %s\n", error->message);
+       g_clear_error (&error);
+     }
++#endif
+ 
+   if (!email_init (connection, &error))
+     {
+@@ -167,11 +179,13 @@
+       g_clear_error (&error);
+     }
+ 
++#ifndef SESSION_ONLY
+   if (!dynamic_launcher_init (connection, &error))
+     {
+       g_warning ("error: %s\n", error->message);
+       g_clear_error (&error);
+     }
++#endif
+ 
+ #ifdef BUILD_LOCKDOWN
+   if (!lockdown_init (connection, &error))
+@@ -230,7 +244,9 @@
+   /* Avoid pointless and confusing recursion */
+   g_unsetenv ("GTK_USE_PORTAL");
+ 
++#ifndef SESSION_ONLY
+   gtk_init (&argc, &argv);
++#endif
+ 
+   context = g_option_context_new ("- portal backends");
+   g_option_context_set_summary (context,
