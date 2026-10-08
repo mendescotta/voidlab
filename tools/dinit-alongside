@@ -1,0 +1,108 @@
+#!/bin/sh
+# dinit-alongside — boot dinit (voidlab's dinit-void) from a second rEFInd entry on a
+# root that runs runit-void. The runit entry, /etc/runit and /var/service are not touched.
+#
+#   dinit-alongside install    enable the usual desktop services for dinit, write the
+#                              rEFInd entries and install the kernel hooks that keep them
+#                              in step with /boot
+#   dinit-alongside refind     (re)write the rEFInd entries only (the kernel hooks call this)
+#   dinit-alongside remove     drop the entries, the hooks and the service links
+#
+# Needs dinit-void-core installed (it does not conflict with runit-void; the full
+# dinit-void package does). The entry boots init=/usr/libexec/dinit-alongside-init,
+# which bind-mounts dinit's halt/shutdown over runit's for that boot only.
+set -eu
+
+REFIND_CONF=${REFIND_CONF:-/boot/efi/EFI/refind/refind.conf}
+BOOT_D=${BOOT_D:-/etc/dinit.d/boot.d}
+SERVICES=${SERVICES:-"dbus elogind polkitd NetworkManager gdm chronyd bluetoothd rtkit agetty-tty1 agetty-tty6"}
+HOOK_NAME=51-refind-dinit
+BEGIN="# >>> voidlab dinit-alongside (generated, do not edit)"
+END="# <<< voidlab dinit-alongside"
+SELF=/usr/local/sbin/dinit-alongside
+
+die() { echo "dinit-alongside: $*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || die "run as root"
+
+entries() {
+	root_src=$(findmnt -n -o SOURCE /)
+	root_uuid=$(blkid -s UUID -o value "$root_src")
+	root_partuuid=$(blkid -s PARTUUID -o value "$root_src")
+	[ -n "$root_uuid" ] && [ -n "$root_partuuid" ] || die "cannot identify the root partition ($root_src)"
+	# keep the running kernel's extra options (nvidia, quiet, ...), minus what we set ourselves
+	extra=""
+	for o in $(cat /proc/cmdline); do
+		case "$o" in
+		BOOT_IMAGE=*|initrd=*|init=*|root=*|ro|rw) ;;
+		*) extra="$extra $o" ;;
+		esac
+	done
+	for k in $(ls /boot/vmlinuz-* 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -rV); do
+		[ -f "/boot/initramfs-$k.img" ] || continue
+		cat <<EOF
+menuentry "Void Linux (dinit) $k" {
+    icon     /EFI/refind/icons/os_void.png
+    volume   $root_partuuid
+    loader   /boot/vmlinuz-$k
+    initrd   /boot/initramfs-$k.img
+    options  "ro root=UUID=$root_uuid init=/usr/libexec/dinit-alongside-init$extra"
+}
+EOF
+	done
+}
+
+strip_block() {
+	awk -v b="$BEGIN" -v e="$END" '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }' "$1"
+}
+
+refind() {
+	[ -f "$REFIND_CONF" ] || die "$REFIND_CONF not found"
+	[ -x /usr/libexec/dinit-alongside-init ] || die "dinit-void-core is not installed"
+	tmp=$(mktemp)
+	{ strip_block "$REFIND_CONF"; echo "$BEGIN"; entries; echo "$END"; } > "$tmp"
+	if ! cmp -s "$tmp" "$REFIND_CONF"; then
+		[ -f "$REFIND_CONF.pre-dinit" ] || cp -p "$REFIND_CONF" "$REFIND_CONF.pre-dinit"
+		cat "$tmp" > "$REFIND_CONF"
+	fi
+	rm -f "$tmp"
+}
+
+hooks() {
+	for d in post-install post-remove; do
+		cat > "/etc/kernel.d/$d/$HOOK_NAME" <<EOF
+#!/bin/sh
+# keeps the rEFInd "Void Linux (dinit)" entries in step with /boot
+exec $SELF refind
+EOF
+		chmod 755 "/etc/kernel.d/$d/$HOOK_NAME"
+	done
+}
+
+services() {
+	mkdir -p "$BOOT_D"
+	for s in $SERVICES; do
+		if [ -e "/etc/dinit.d/$s" ] || [ -e "/usr/lib/dinit.d/$s" ]; then
+			ln -sfn "../$s" "$BOOT_D/$s"
+		else
+			echo "dinit-alongside: no dinit service '$s', skipped" >&2
+		fi
+	done
+}
+
+case "${1:-}" in
+install)
+	[ -f "$0" ] && [ "$(readlink -f "$0")" != "$SELF" ] && install -m755 "$0" "$SELF"
+	services
+	hooks
+	refind
+	echo "installed; reboot and pick 'Void Linux (dinit)' in rEFInd"
+	;;
+refind) refind ;;
+remove)
+	for s in $SERVICES; do [ -L "$BOOT_D/$s" ] && rm -f "$BOOT_D/$s"; done
+	rm -f "/etc/kernel.d/post-install/$HOOK_NAME" "/etc/kernel.d/post-remove/$HOOK_NAME"
+	tmp=$(mktemp); strip_block "$REFIND_CONF" > "$tmp"; cat "$tmp" > "$REFIND_CONF"; rm -f "$tmp"
+	rm -f "$SELF"
+	;;
+*) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

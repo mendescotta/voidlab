@@ -1,7 +1,7 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.99.25
-revision=5
+revision=7
 # Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
 # device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
 # dbus, elogind, polkitd, NetworkManager, wpa_supplicant, acpid, display managers, chronyd).
@@ -11,20 +11,17 @@ build_style=meson
 configure_args="-Ddefault-path-env=/usr/bin"
 hostmakedepends="pkg-config"
 makedepends="libkmod-devel dbus-devel"
-depends="dinit sd-tools kmod eudev kbd util-linux"
-# service enablement dirs (the boot/system targets' waits-for.d); tmpfiles
-# only creates them at boot, too late for tools that enable services offline
-make_dirs="
- /etc/dinit.d/boot.d 0755 root root
- /usr/lib/dinit.d/boot.d 0755 root root"
+# dinit-void is the exclusive-init package (ISOs, vessel installs): the five
+# commands that collide with runit-void plus a dependency on -core. -core holds
+# everything else and installs next to runit-void, to boot dinit from a second
+# boot entry on a runit system (see dinit-alongside-init).
+depends="dinit-void-core>=${version}_${revision}"
 short_desc="Dinit-chimera early-boot services with Void Linux integration"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause"
 homepage="https://github.com/chimera-linux/dinit-chimera"
 distfiles="https://github.com/chimera-linux/dinit-chimera/archive/v${version}.tar.gz"
 checksum=777dbee5a69f96a1a4cd812c7fa3dce62a7247a4be99420832a778e548c357f7
-# replaces the former separate dinit-chimera package
-replaces="dinit-chimera>=0"
 # ships /usr/bin/init and owns /usr/bin/{shutdown,halt,poweroff,reboot} like runit-void
 conflicts="runit-void>=0"
 
@@ -62,6 +59,16 @@ EOF2
 		ln -s dinit-$c ${DESTDIR}/usr/bin/$c
 	done
 
+	# init is a symlink: -core keeps the binary under a name that does not
+	# collide with runit-void's /usr/bin/init
+	mv ${DESTDIR}/usr/bin/init ${DESTDIR}/usr/libexec/dinit-init
+	ln -s ../libexec/dinit-init ${DESTDIR}/usr/bin/init
+
+	# booting dinit from a second entry on a runit system
+	vinstall ${FILESDIR}/dinit-alongside-init 755 usr/libexec
+	vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside shutdown
+	vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside halt
+
 	vmkdir etc/dinit.d
 	for c in 1 2 3 4 5 6 S0; do
 		sed "s/@TTY@/tty$c/g" ${FILESDIR}/agetty.in \
@@ -70,7 +77,31 @@ EOF2
 	for c in dhcpcd sshd ssh-keygen dbus elogind polkitd NetworkManager \
 		lightdm gdm sddm cosmic-greeter-daemon cosmic-greeter chronyd \
 		vmtoolsd vmware-vmblock-fuse vboxservice spice-vdagentd \
-		power-profiles-daemon switcheroo-control wpa_supplicant acpid; do
+		power-profiles-daemon switcheroo-control wpa_supplicant acpid bluetoothd rtkit; do
 		vinstall ${FILESDIR}/$c.service 644 etc/dinit.d $c
 	done
+}
+
+dinit-void-core_package() {
+	short_desc+=" - everything except the files that collide with runit-void"
+	depends="dinit sd-tools kmod eudev kbd util-linux"
+	replaces="dinit-chimera>=0"
+	# service enablement dirs (the boot/system targets' waits-for.d); tmpfiles
+	# only creates them at boot, too late for tools that enable services offline
+	make_dirs="
+	 /etc/dinit.d/boot.d 0755 root root
+	 /usr/lib/dinit.d/boot.d 0755 root root"
+	pkg_install() {
+		local f
+		vmove etc/dinit.d
+		vmove usr/lib
+		vmove usr/libexec
+		vmove usr/share
+		for f in ${DESTDIR}/usr/bin/*; do
+			case "${f##*/}" in
+			init|shutdown|halt|poweroff|reboot) ;;
+			*) vmove usr/bin/${f##*/} ;;
+			esac
+		done
+	}
 }

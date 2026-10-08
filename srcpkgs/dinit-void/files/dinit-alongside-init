@@ -1,0 +1,12 @@
+#!/bin/sh
+# PID 1 for booting dinit on a root where runit-void owns /usr/bin/{init,shutdown,
+# halt,poweroff,reboot}: put init=/usr/libexec/dinit-alongside-init on the kernel
+# command line. The bind mounts below last for this boot only; nothing on disk
+# changes, so the runit boot entry is unaffected. poweroff and reboot are symlinks
+# to halt on runit-void, so mounting over halt covers all three.
+PATH=/usr/bin:/usr/sbin
+d=/usr/lib/dinit/alongside
+for c in shutdown halt; do
+	mount --bind "$d/$c" "/usr/bin/$c" 2>/dev/null
+done
+exec /usr/libexec/dinit-init "$@"

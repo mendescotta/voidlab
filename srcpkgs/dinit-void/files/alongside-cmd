@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stand-in for runit-void's halt/shutdown while booted under dinit (see
+# dinit-alongside-init). Picks dinit-halt, dinit-poweroff, dinit-reboot or
+# dinit-shutdown from the name it was invoked as.
+exec /usr/bin/dinit-"${0##*/}" "$@"
