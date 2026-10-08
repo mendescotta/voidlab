@@ -4,7 +4,7 @@ _desc="NVIDIA drivers for linux"
 
 pkgname=nvidia
 version=615.78.08
-revision=2
+revision=3
 maintainer="Andrew Benson <abenson+void@gmail.com>"
 license="custom:NVIDIA Proprietary"
 homepage="https://www.nvidia.com/en-us/drivers/unix/"
@@ -135,6 +135,9 @@ do_install() {
 	vinstall libnvidia-egl-wayland.so.1.1.20 755 usr/lib
 	ln -sf libnvidia-egl-wayland.so.1.1.20 \
 		${DESTDIR}/usr/lib/libnvidia-egl-wayland.so.1
+	vinstall libnvidia-egl-wayland2.so.1.0.2 755 usr/lib
+	ln -sf libnvidia-egl-wayland2.so.1.0.2 \
+		${DESTDIR}/usr/lib/libnvidia-egl-wayland2.so.1
 	vinstall libnvidia-egl-gbm.so.1.1.3 755 usr/lib
 	ln -sf libnvidia-egl-gbm.so.1.1.3 \
 		${DESTDIR}/usr/lib/libnvidia-egl-gbm.so.1
@@ -149,6 +152,8 @@ do_install() {
 
 	vinstall 10_nvidia.json 755 usr/share/glvnd/egl_vendor.d
 	vinstall 10_nvidia_wayland.json \
+		755 usr/share/egl/egl_external_platform.d
+	vinstall 09_nvidia_wayland2.json \
 		755 usr/share/egl/egl_external_platform.d
 
 	vinstall libnvidia-cfg.so.${version} 755 usr/lib
@@ -319,6 +324,10 @@ nvidia-libs_package() {
 	conflicts="nvidia580-libs>=0 nvidia470-libs>=0 nvidia390-libs>=0"
 	pkg_install() {
 		vmove usr/lib
+		# EGL vendor/platform files must travel with the EGL libraries,
+		# or libglvnd falls back to Mesa and gnome-shell crashes
+		vmove usr/share/glvnd
+		vmove usr/share/egl
 	}
 }
 
