@@ -1,6 +1,6 @@
 # Template file for 'voyage'
 pkgname=voyage
-version=0.4.1
+version=0.4.2
 revision=1
 build_style=cargo
 hostmakedepends="pkg-config"
@@ -11,7 +11,7 @@ maintainer="mendescotta <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/voyage"
 distfiles="https://github.com/mendescotta/voyage/archive/refs/tags/v${version}.tar.gz"
-checksum=903275309a47e6c0a26eb86bcb818bedf1cdf3b36fa8cb7dfc0af0d82b16e017
+checksum=f7d1fe66f35b79314ceb176f5416d6e75dfb382d31bb2559abde7040802efe1c
 
 do_install() {
 	vbin target/${RUST_TARGET}/release/voyage
