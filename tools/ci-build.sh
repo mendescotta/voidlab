@@ -52,6 +52,18 @@ repo_list() { (shopt -s nullglob; for f in repo/*.xbps; do echo "${f##*/}"; done
 seed_binpkgs || exit 1
 plan=$("$VL" update --check ${INPUT_PKG:+"$INPUT_PKG"} </dev/null) || exit 1
 printf '%s\n' "$plan"
+# human-readable record of everything checked, so "nothing to do" is distinguishable from "did not look";
+# written outside $OUT because the publish job validates $OUT strictly
+SUMMARY=${AUTO_UPDATE_SUMMARY:-}
+if [ -n "$SUMMARY" ]; then
+	{
+		echo '### auto-update: packages checked'
+		echo
+		echo '| status | package | ours | upstream |'
+		echo '|---|---|---|---|'
+		awk -F'\t' 'NF { printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4 }' <<<"$plan"
+	} > "$SUMMARY"
+fi
 
 while IFS=$'\t' read -r -u 3 status pkg ours other; do
 	case $status in
@@ -92,3 +104,10 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 done 3<<<"$plan"
 git reset -q --hard </dev/null
 log "passed: $(cut -f2 "$OUT/passed.tsv" | tr '\n' ' ')"
+if [ -n "$SUMMARY" ]; then
+	{
+		echo
+		echo "Passed: $(cut -f2 "$OUT/passed.tsv" | tr '\n' ' ')"
+		echo "Failed: $(cut -f1 "$OUT/failed.tsv" | tr '\n' ' ')"
+	} >> "$SUMMARY"
+fi

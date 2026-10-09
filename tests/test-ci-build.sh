@@ -37,7 +37,7 @@ chmod +x "$T/vl"
 mkdir -p "$T/bin"
 printf '#!/bin/sh\necho "$*" >> "%s/gh.log"\nexit 0\n' "$T" > "$T/bin/gh"; chmod +x "$T/bin/gh"
 export PATH=$T/bin:$PATH VOIDLAB_BIN=$T/vl GH_TOKEN=gh-token-value VOIDLAB_PRIVKEY=PRIVATE-KEY-LINE1
-run() { (cd "$W" && CI_AUTO_UPDATE_FORCE=1 AUTO_UPDATE_OUT=$W/out bash tools/ci-build.sh) 2>&1; }
+run() { (cd "$W" && CI_AUTO_UPDATE_FORCE=1 AUTO_UPDATE_OUT=$W/out AUTO_UPDATE_SUMMARY=$T/summary.md bash tools/ci-build.sh) 2>&1; }
 
 out=$(cd "$W" && bash tools/ci-build.sh 2>&1 || true)
 assert_grep "refuses to run outside GitHub Actions" 'refusing to run outside GitHub Actions' <(echo "$out")
@@ -70,6 +70,12 @@ assert_eq   "nothing is committed"               "$(git -C "$W" rev-list --count
 assert_eq   "gh is never asked for anything"     "$(wc -c < "$T/gh.log")" "0"
 assert_grep "builds do not see the signing key"  'build a sees: key=none ' "$T/env.log"
 assert_grep "builds do not see the GitHub token" 'token=none$' "$T/env.log"
+
+assert_grep "summary lists every checked package" '^| bump | a | 1.0_1 | 1.1 |$' "$T/summary.md"
+assert_grep "summary lists up-to-date packages"   '^| current | e | 1.0_1 | - |$' "$T/summary.md"
+assert_grep "summary says what passed"            'Passed: a c' "$T/summary.md"
+assert_grep "summary says what failed"            'Failed: b' "$T/summary.md"
+assert_no   "the summary stays out of the artifact" "$W/out/summary.md"
 
 # an explicit package is passed through, and the out dir is rebuilt from scratch
 printf 'current\tz\t1.0_1\t-\n' > "$T/plan"; : > "$T/calls.log"
