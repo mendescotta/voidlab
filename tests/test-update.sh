@@ -32,7 +32,7 @@ touch srcpkgs/.keep; git add -A; git commit -qm up
 R=$T/root; mkdir -p "$R/tools"; cp "$HERE/../voidlab" "$R/"
 for p in a c e f n v m; do mkdir -p "$R/srcpkgs/$p"; ttmpl $p 1.0 1 > "$R/srcpkgs/$p/template"; done
 mkdir -p "$R/srcpkgs/b"; ttmpl b 2.0 1 > "$R/srcpkgs/b/template"
-printf '# allowlist\na\nb  # leaf\nc\nd\ne\nf\n' > "$R/tools/auto-update.allow"
+printf '# tiers\na auto\nb auto  # leaf\nc auto\nd auto\ne auto\nf review\nm manual\n' > "$R/tools/update-tiers"
 VOIDLAB_UPSTREAM_URL=$U VOIDLAB_NO_BOOTSTRAP=1 "$R/voidlab" sync >/dev/null
 
 printf '#!/bin/sh\nsed -i "s/^checksum=.*/checksum=deadbeef/" "$1"\n' > "$T/gensum"
@@ -43,9 +43,9 @@ out=$("$R/voidlab" update --check)
 assert_grep "a: highest stable by sort -V (1.10, not 1.3rc1 or 1.2)" "^bump${tab}a${tab}1.0_1${tab}1.10\$" <(echo "$out")
 assert_grep "b: no update is current"            "^current${tab}b${tab}2.0_1" <(echo "$out")
 assert_grep "c: only pre-releases is current"    "^current${tab}c${tab}1.0_1" <(echo "$out")
-assert_grep "d: allowlisted without template fails" "^fail${tab}d${tab}-${tab}no overlay template" <(echo "$out")
+assert_grep "d: listed without a template fails" "^fail${tab}d${tab}-${tab}no overlay template" <(echo "$out")
 assert_grep "e: error text without -> is current" "^current${tab}e${tab}1.0_1" <(echo "$out")
-assert_eq   "n: not on the allowlist is not listed" "$(grep -c "${tab}n${tab}" <<<"$out" || true)" "0"
+assert_eq   "n: unlisted (notify) is not listed" "$(grep -c "${tab}n${tab}" <<<"$out" || true)" "0"
 assert_grep "--check leaves the template alone"  '^version=1.0$' "$R/srcpkgs/a/template"
 
 out=$(VOIDLAB_GENSUM=$T/gensum "$R/voidlab" update a)
