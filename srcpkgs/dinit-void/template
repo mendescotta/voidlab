@@ -1,7 +1,7 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.99.25
-revision=8
+revision=9
 # Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
 # device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
 # dbus, elogind, polkitd, NetworkManager, wpa_supplicant, acpid, display managers, chronyd).
@@ -41,6 +41,7 @@ post_install() {
 	vinstall ${FILESDIR}/dinit-console 755 usr/libexec
 	vinstall ${FILESDIR}/agetty-default 755 usr/lib/dinit
 	vinstall ${FILESDIR}/ssh-keygen 755 usr/lib/dinit
+	vinstall ${FILESDIR}/editor.sh 644 etc/profile.d
 
 	# Eject the optical live medium at the very end of shutdown, like Debian/Devuan.
 	# `eject -s` skips the kernel's "device busy" check for the mounted ISO; nothing is
