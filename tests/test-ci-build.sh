@@ -9,8 +9,9 @@ export GIT_CONFIG_GLOBAL=$T/gitconfig GIT_CONFIG_SYSTEM=/dev/null
 git config --global user.email t@t; git config --global user.name t; git config --global init.defaultBranch main
 
 W=$T/work; mkdir -p "$W/tools"; cd "$W"; git init -q
-cp "$HERE/../tools/ci-build.sh" tools/ 2>/dev/null || true
-for p in a b c z; do mkdir -p srcpkgs/$p; tmpl $p 1.0 1 > srcpkgs/$p/template; done
+cp "$HERE/../tools/ci-build.sh" "$HERE/../tools/ci-lib.sh" tools/ 2>/dev/null || true
+for p in a b c z dep nv; do mkdir -p srcpkgs/$p; tmpl $p 1.0 1 > srcpkgs/$p/template; done
+printf "# never\nnv\n" > tools/never-publish
 git add -A; git commit -qm init
 # a pulled release package must be visible to xbps-src, which only reads hostdir/binpkgs
 mkdir -p repo "$T/empty"
@@ -29,7 +30,9 @@ update)
 build) echo "build \$2 sees: key=\${VOIDLAB_PRIVKEY:-none} token=\${GH_TOKEN:-none}" >> "$T/env.log"
 	[ "\$2" != b ] || { echo "build log for b: compile error"; exit 1; }
 	ver=\$(awk -F'\t' -v p="\$2" '\$2 == p { print (\$1 == "bump" ? \$4 "_1" : \$3) }' "$T/plan")
-	echo x > "repo/\$2-\$ver.noarch.xbps" ;;
+	echo x > "repo/\$2-\$ver.noarch.xbps"
+	# a build that also had to build dependencies of other overlay templates
+	if [ -f "$T/deps" ] && [ "\$2" = a ]; then echo x > repo/dep-1.0_1.noarch.xbps; echo x > repo/nv-1.0_1.noarch.xbps; echo x > repo/zzz-1.0_1.noarch.xbps; fi ;;
 esac
 exit 0
 STUB
@@ -63,7 +66,7 @@ assert_no   "no template for an unpublished package" "$W/out/templates/c"
 assert_no   "no template for a failed package"   "$W/out/templates/b"
 assert_file "new packages are collected"         "$W/out/xbps/a-1.1_1.noarch.xbps"
 assert_file "unpublished packages are collected" "$W/out/xbps/c-1.0_1.noarch.xbps"
-assert_no   "pulled packages are not re-collected" "$W/out/xbps/lib-1.0_1.noarch.xbps"
+assert_no   "pulled packages are not re-collected" "$W/out/xbps/dep-1.0_1.noarch.xbps"
 assert_no   "a failed build contributes nothing"  "$W/out/xbps/b-2.0_1.noarch.xbps"
 assert_eq   "the work tree is reset between packages" "$(git -C "$W" status --short -- srcpkgs | wc -l)" "0"
 assert_eq   "nothing is committed"               "$(git -C "$W" rev-list --count HEAD)" "1"
@@ -76,6 +79,19 @@ assert_grep "summary lists up-to-date packages"   '^| current | e | 1.0_1 | - |$
 assert_grep "summary says what passed"            'Passed: a c' "$T/summary.md"
 assert_grep "summary says what failed"            'Failed: b' "$T/summary.md"
 assert_no   "the summary stays out of the artifact" "$W/out/summary.md"
+
+# dependencies that had to be built along the way: owned by an overlay template -> `unpublished`
+# entry of that owner; never-publish owners and unknown names are not trusted with an entry
+printf 'bump\ta\t1.0_1\t1.1\n' > "$T/plan"; : > "$T/deps"
+run >/dev/null
+assert_grep "a dependency build becomes an unpublished entry of its owner" '^unpublished'"$tab"'dep'"$tab"'1.0_1$' "$W/out/passed.tsv"
+assert_file "its package file is in the artifact"   "$W/out/xbps/dep-1.0_1.noarch.xbps"
+assert_eq   "a never-publish owner gets no entry"   "$(grep -c "${tab}nv${tab}" "$W/out/passed.tsv" || true)" "0"
+assert_no   "and its package file is left out"      "$W/out/xbps/nv-1.0_1.noarch.xbps"
+assert_eq   "an unknown package gets no entry"      "$(grep -c "zzz" "$W/out/passed.tsv" || true)" "0"
+assert_file "an unknown package file is still handed over (publish rejects it)" "$W/out/xbps/zzz-1.0_1.noarch.xbps"
+assert_eq   "the built package itself is one entry" "$(grep -c "${tab}a${tab}" "$W/out/passed.tsv" || true)" "1"
+rm -f "$T/deps"
 
 # a bump whose autobump branch already exists on origin is not rebuilt
 git init -q --bare "$T/origin.git"; git -C "$W" remote add origin "$T/origin.git"

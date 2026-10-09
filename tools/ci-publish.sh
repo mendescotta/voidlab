@@ -4,7 +4,9 @@
 # is untrusted DATA, validated strictly before anything is pushed, merged or signed. Any deviation
 # aborts the whole run:
 #   - only these files, no symlinks: passed.tsv failed.tsv templates/<n>/template xbps/<n>.xbps logs/<n>.log
-#   - passed.tsv: `bump|unpublished<TAB>pkg<TAB>version_revision`, pkg in the auto or review tier (or INPUT_PKG)
+#   - passed.tsv: `bump|unpublished<TAB>pkg<TAB>version_revision`. A bump needs the auto or review tier (or
+#     INPUT_PKG). `unpublished` (a template already on main that the release lacks, also a dependency CI had to
+#     build along the way) may be any tier, but never a template on tools/never-publish
 #   - a bumped template may differ from main only in its version, revision and checksum lines
 #   - a package file must be the passed package or one of its declared subpackages, at the passed version
 # Then: one PR per bump (merged), failures become issues, the packages are added to the pulled release
@@ -30,6 +32,7 @@ export VOIDLAB_KEY=${VOIDLAB_KEY:-$HOME/.config/voidlab/privkey.pem}
 export GH_REPO=${GH_REPO:-${GITHUB_REPOSITORY:-}}
 [ -n "$BUILD_OUT" ] && [ -d "$BUILD_OUT" ] || die "BUILD_OUT must be the downloaded build artifact directory"
 
+. tools/ci-lib.sh
 NAME_RE='[A-Za-z0-9][A-Za-z0-9._+~-]*'
 PKG_RE='^[a-z0-9][a-z0-9._+-]*$'
 VER_RE='[0-9][0-9A-Za-z.+~]*'
@@ -54,6 +57,7 @@ done < <(find "$BUILD_OUT" -type f)
 tiers=$(sed -e 's/#.*//' tools/update-tiers 2>/dev/null | awk 'NF')
 badtier=$(awk 'NF != 2 || $2 !~ /^(auto|review|manual)$/ || seen[$1]++' <<<"$tiers")
 [ -z "$badtier" ] || die "bad line in tools/update-tiers (malformed or duplicate): $badtier"
+never=$(list_names tools/never-publish)
 tier_of() { awk -v p="$1" '$1 == p { print $2 }' <<<"$tiers"; }
 declare -A STATUS VERREV ALLOWED
 # fields are split by hand: `read` with a tab IFS collapses empty fields, so a line could be accepted
@@ -70,11 +74,14 @@ while IFS= read -r line; do
 	[[ $verrev =~ $VERREV_RE ]] || die "invalid version in passed.tsv: $pkg"
 	[ -z "${STATUS[$pkg]:-}" ] || die "duplicate entry in passed.tsv: $pkg"
 	[ -f "srcpkgs/$pkg/template" ] && [ ! -L "srcpkgs/$pkg" ] || die "no template for $pkg in the repository"
-	case $(tier_of "$pkg") in
-	auto | review) ;;
-	manual) die "$pkg is tier manual: CI never bumps or publishes it" ;;
-	*) [ "$pkg" = "${INPUT_PKG:-}" ] || die "$pkg is not in the auto or review tier" ;;
-	esac
+	grep -qxF -- "$pkg" <<<"$never" && die "$pkg is on tools/never-publish"
+	if [ "$status" = bump ]; then
+		case $(tier_of "$pkg") in
+		auto | review) ;;
+		manual) die "$pkg is tier manual: CI never bumps it" ;;
+		*) [ "$pkg" = "${INPUT_PKG:-}" ] || die "$pkg is not in the auto or review tier" ;;
+		esac
+	fi
 	if [ "$status" = unpublished ]; then
 		# nothing is bumped, so the build must be of the template that is on main: no other version
 		mver=$(sed -n 's/^version=//p' "srcpkgs/$pkg/template" | head -n1 | tr -d "\"'")
@@ -86,18 +93,6 @@ while IFS= read -r line; do
 	VERREV[$pkg]=$verrev
 done < "$BUILD_OUT/passed.tsv"
 
-# names a package may legitimately produce: itself, subpackages declared in the template (text only,
-# nothing is executed) and symlinked subpackage directories
-allowed_names() {
-	local pkg=$1 t=srcpkgs/$1/template w l
-	echo "$pkg"
-	sed -n 's/^\([A-Za-z0-9._+-][A-Za-z0-9._+-]*\)_package[[:space:]]*(.*/\1/p' "$t"
-	perl -0ne 'print "$1\n" if /^subpackages=["\x27]?([^"\x27]*)["\x27]?/m' "$t" | tr -s ' \t\n' '\n\n\n' |
-		sed -e "s/\${pkgname}/$pkg/g" -e "s/\$pkgname/$pkg/g"
-	for l in srcpkgs/*; do
-		[ -L "$l" ] && [ "$(readlink "$l")" = "$pkg" ] && echo "${l##*/}"
-	done
-}
 for pkg in "${!STATUS[@]}"; do
 	ALLOWED[$pkg]=$(allowed_names "$pkg" | grep -xE "$NAME_RE" || true)
 done
