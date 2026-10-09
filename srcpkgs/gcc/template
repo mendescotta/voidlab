@@ -62,7 +62,6 @@ subpackages="libgcc libgomp libgomp-devel libatomic libatomic-devel"
 # _have_gccgo) and Objective-C are off: nothing in the stack uses them, and Ada alone needs an installed
 # gcc-ada to bootstrap and adds a large share of the build time. Flip the switches to bring them back.
 build_options="ada gnatboot"
-build_options_default=""
 desc_option_ada="Enable Ada build"
 desc_option_gnatboot="Enable Ada bootstrap using adacore.com binaries"
 
