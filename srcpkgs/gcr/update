@@ -1,0 +1,2 @@
+# gcr 4 is the separate gcr4 package; 3.9x were its pre-releases
+ignore="3.9* [4-9].*"
