@@ -276,16 +276,22 @@ SHIM
 out=$(run) && rc=0 || rc=$?
 assert_eq   "failed PR creation: branch is removed again" "$(git -C "$T/origin.git" branch --list 'autobump/*' | wc -l)" "0"
 
-# 3g. `unpublished` may be published at any tier (a template already merged on main), bumps may not
+# 3g. `unpublished` of a package outside the auto/review tiers must be a build dependency of something
+# being published (compromised build jobs cannot claim arbitrary templates); bumps need the tier
+fresh; good_a
+printf 'a auto\nc auto\nz manual\n' > "$T/work/tools/update-tiers"
+printf 'makedepends="z-devel"\n' >> "$T/work/srcpkgs/a/template"; printf 'makedepends="z-devel"\n' >> "$T/out/templates/a/template"
+(cd "$T/work" && git add -A && git commit -qm t && git push -q origin main)
+printf 'bump\ta\t1.1_1\nunpublished\tc\t1.0_1\nunpublished\tz\t1.0_1\n' > "$T/out/passed.tsv"; addpkg z-1.0_1; addpkg z-devel-1.0_1
+out=$(run) && rc=0 || rc=$?
+assert_eq   "unpublished dependency of a published package is accepted" "$rc" "0"
+assert_grep "and it is in the release set" 'z-1.0_1' "$T/calls.log"
 fresh; good_a
 printf 'a auto\nc auto\nz manual\n' > "$T/work/tools/update-tiers"; (cd "$T/work" && git add -A && git commit -qm t && git push -q origin main)
-printf 'unpublished\tz\t1.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps"/*; rm -rf "$T/out/templates"/*; addpkg z-1.0_1; addpkg z-devel-1.0_1
-out=$(run) && rc=0 || rc=$?
-assert_eq   "unpublished manual-tier package is published" "$rc" "0"
-assert_grep "and it is in the release set" 'z-1.0_1' "$T/calls.log"
+printf 'bump\ta\t1.1_1\nunpublished\tc\t1.0_1\nunpublished\tz\t1.0_1\n' > "$T/out/passed.tsv"; addpkg z-1.0_1; addpkg z-devel-1.0_1
+aborted "unpublished manual-tier package nobody depends on" "not a build dependency"
 fresh; good_a; printf 'unpublished\tb\t1.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps"/*; rm -rf "$T/out/templates"/*; addpkg b-1.0_1; addpkg b-devel-1.0_1
-out=$(run) && rc=0 || rc=$?
-assert_eq   "unpublished unlisted package is published" "$rc" "0"
+aborted "unpublished unlisted package nobody depends on" "not a build dependency"
 # never-publish wins over everything
 fresh; good_a; printf 'unpublished\tb\t1.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps"/*; addpkg b-1.0_1; addpkg b-devel-1.0_1
 printf '# never\nb\n' > "$T/work/tools/never-publish"; (cd "$T/work" && git add -A && git commit -qm n && git push -q origin main)
