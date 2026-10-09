@@ -1,7 +1,7 @@
 name: overlay-report
 
 # Weekly: one issue listing overlay templates official Void has caught up with, and newer upstream
-# releases that are not on the auto-update allowlist. Read-only apart from that issue.
+# releases for packages that auto-update does not touch (tier manual or unlisted). Read-only apart from that issue.
 on:
   schedule:
     - cron: "41 5 * * 1"
