@@ -9,9 +9,12 @@ now=$(date -u -d "${WATCHDOG_NOW:-now}" +%s)
 
 problems=""
 check() { # workflow file, max age in hours
-	local wf=$1 max=$2 last ts age
+	local wf=$1 max=$2 last first ts age
 	last=$(gh run list --workflow "$wf.yml" --event schedule --status success --limit 1 --json createdAt --jq '.[0].createdAt // empty' 2>/dev/null || true)
 	if [ -z "$last" ]; then
+		# a workflow younger than its limit may simply not have reached its first scheduled run yet
+		first=$(gh run list --workflow "$wf.yml" --limit 500 --json createdAt --jq '.[-1].createdAt // empty' 2>/dev/null || true)
+		if [ -n "$first" ] && [ $(((now - $(date -u -d "$first" +%s)) / 3600)) -le "$max" ]; then return; fi
 		problems+="- \`$wf\`: no successful scheduled run found"$'\n'
 		return
 	fi

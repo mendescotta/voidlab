@@ -1,0 +1,2 @@
+# a 2008 tarball named by date sorts above every real release
+ignore="2008*"
