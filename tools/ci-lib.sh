@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# Shared by tools/ci-build.sh and tools/ci-publish.sh. Reads the trusted checkout only (text, nothing
-# is executed); both scripts run from the repository root.
+# Shared by tools/ci-build.sh, tools/ci-publish.sh and `voidlab test`. Reads the trusted checkout only
+# (text, nothing is executed); all run from the repository root.
 
 # allowed_names <pkg>: the names a template may produce: itself, the subpackages it declares and the
 # symlinked subpackage directories.
@@ -73,4 +73,73 @@ deps_closure() {
 		done < <(dep_words "$t")
 	done
 	printf '%s\n' "${!seen[@]}"
+}
+
+# declared <template> <key> <version> <revision>: the words a template assigns to `key` (text only, nothing
+# executed), on any line including subpackage functions, with the simple expansions applied; a mention in a
+# comment or a longer word does not count
+declared() {
+	perl -0ne 'while (/^[ \t]*'"$2"'=["\x27]?([^"\x27]*)["\x27]?/mg) { print "$1\n" }' "srcpkgs/$1/template" | tr -s ' \t\n' '\n\n\n' |
+		sed -e "s/\${pkgname}/$1/g" -e "s/\$pkgname/$1/g" -e "s/\${version}/$3/g" -e "s/\$version/$3/g" \
+			-e "s/\${revision}/$4/g" -e "s/\$revision/$4/g"
+}
+
+# shlibs_owner <soname> <shlibs file>...: the package name common/shlibs gives the soname (later files win;
+# empty when none lists it)
+shlibs_owner() {
+	local so=$1 f files=(); shift
+	for f; do [ -f "$f" ] && files+=("$f"); done
+	[ ${#files[@]} -gt 0 ] || return 0
+	awk -v s="$so" '$1 == s { m = $2 } END { print m }' "${files[@]}" | sed -E 's/-[^-]+_[0-9]+$//'
+}
+
+# (grep -q is fed by here-strings below, never by a pipe: it exits at the first match, and under pipefail
+# the writer's SIGPIPE would turn a match into a failure)
+# pkg_meta_problems <repo> <file name> <owner> <shlibs file>...: one line per thing in a built package that
+# can change what other packages resolve to and that neither its template nor its own files account for.
+# <repo> is an indexed repository holding the package; nothing in the package is executed. The rules follow
+# xbps-src: hooks/pre-pkg/04-generate-provides.sh adds pc: for every .pc file, cmd: for every /usr/bin file
+# (cmd:X-0_1 for an alternatives link), py3: for python metadata; post-install/98-shlib-provides.sh adds the
+# ELF SONAME of every shared library. A soname is accepted when a library of that name is in the package and
+# common/shlibs does not give it to a package of another template.
+pkg_meta_problems() {
+	local repo=$1 b=$2 owner=$3; shift 3
+	local name vr ver rev key v x files alts so mapped
+	[[ $b =~ ^(.+)-([0-9][0-9A-Za-z.+~]*_[0-9]+)\.(x86_64|noarch)\.xbps$ ]] || { echo "invalid package file name: $b"; return; }
+	name=${BASH_REMATCH[1]} vr=${BASH_REMATCH[2]}
+	ver=${vr%_*} rev=${vr##*_}
+	_meta() { XBPS_ARCH=x86_64 xbps-query -i -R --repository="$repo" -p "$1" "$name" 2>/dev/null; }
+	files=$(XBPS_ARCH=x86_64 xbps-query -i -R --repository="$repo" -f "$name" 2>/dev/null | sed 's/ -> .*//')
+	alts=$(_meta alternatives)
+	has() { grep -qxF -- "$1" <<<"$files"; }
+	for key in provides replaces reverts conflicts alternatives; do
+		while IFS= read -r v; do
+			[ -n "$v" ] || continue
+			grep -qxF -- "$v" <<<"$(declared "$owner" "$key" "$ver" "$rev")" && continue
+			if [ "$key" = provides ]; then
+				case $v in
+				pc:*-"$vr") x=${v#pc:}; x=${x%-"$vr"}
+					{ has "/usr/lib/pkgconfig/$x.pc" || has "/usr/share/pkgconfig/$x.pc"; } && continue ;;
+				cmd:*-"$vr") x=${v#cmd:}; x=${x%-"$vr"}
+					has "/usr/bin/$x" && continue ;;
+				cmd:*-0_1) x=${v#cmd:}; x=${x%-0_1}
+					awk -F: -v x="$x" '{ n = split($2, p, "/"); if (p[n] == x) f = 1 } END { exit !f }' <<<"$alts" && continue ;;
+				py3:*-"$vr")
+					grep -qE '^/usr/lib/python3[^/]*/site-packages/[^/]+\.(dist|egg)-info(/|$)' <<<"$files" && continue ;;
+				esac
+			fi
+			echo "$b declares $key $v, which the template of $owner does not and its files do not account for"
+		done < <(_meta "$key")
+	done
+	while IFS= read -r so; do
+		[ -n "$so" ] || continue
+		if ! [[ $so =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*\.so(\.[0-9]+)*$ ]]; then echo "$b has an invalid shlib-provides: $so"; continue; fi
+		if ! awk -v s="${so%%.so*}.so" '{ n = split($0, p, "/"); if (index(p[n], s) == 1) f = 1 } END { exit !f }' <<<"$files"; then
+			echo "$b has shlib-provides $so, but no such library is in it"; continue
+		fi
+		mapped=$(shlibs_owner "$so" "$@")
+		if [ -n "$mapped" ] && ! grep -qxF -- "$mapped" <<<"$(allowed_names "$owner")"; then
+			echo "$b has shlib-provides $so, which common/shlibs gives to $mapped (not a package of $owner)"
+		fi
+	done < <(_meta shlib-provides)
 }
