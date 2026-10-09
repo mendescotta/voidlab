@@ -20,7 +20,7 @@ fresh() {
 	rm -rf "$T/work" "$T/origin.git" "$T/out" "$T/pulled"
 	git init -q --bare "$T/origin.git"
 	mkdir -p "$T/work/tools"; cd "$T/work"; git init -q
-	cp "$HERE/../tools/ci-publish.sh" tools/ 2>/dev/null || true
+	cp "$HERE/../tools/ci-publish.sh" "$HERE/../tools/ci-lib.sh" tools/ 2>/dev/null || true
 	for p in a b c z; do mkdir -p srcpkgs/$p; tmpl_p $p 1.0 $H1 > srcpkgs/$p/template; done
 	printf '# tiers\na auto\nc auto\nr review\n' > tools/update-tiers
 	git add -A; git commit -qm init; git remote add origin "$T/origin.git"; git push -q origin main
@@ -275,6 +275,25 @@ exit 0
 SHIM
 out=$(run) && rc=0 || rc=$?
 assert_eq   "failed PR creation: branch is removed again" "$(git -C "$T/origin.git" branch --list 'autobump/*' | wc -l)" "0"
+
+# 3g. `unpublished` may be published at any tier (a template already merged on main), bumps may not
+fresh; good_a
+printf 'a auto\nc auto\nz manual\n' > "$T/work/tools/update-tiers"; (cd "$T/work" && git add -A && git commit -qm t && git push -q origin main)
+printf 'unpublished\tz\t1.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps"/*; rm -rf "$T/out/templates"/*; addpkg z-1.0_1; addpkg z-devel-1.0_1
+out=$(run) && rc=0 || rc=$?
+assert_eq   "unpublished manual-tier package is published" "$rc" "0"
+assert_grep "and it is in the release set" 'z-1.0_1' "$T/calls.log"
+fresh; good_a; printf 'unpublished\tb\t1.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps"/*; rm -rf "$T/out/templates"/*; addpkg b-1.0_1; addpkg b-devel-1.0_1
+out=$(run) && rc=0 || rc=$?
+assert_eq   "unpublished unlisted package is published" "$rc" "0"
+# never-publish wins over everything
+fresh; good_a; printf 'unpublished\tb\t1.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps"/*; addpkg b-1.0_1; addpkg b-devel-1.0_1
+printf '# never\nb\n' > "$T/work/tools/never-publish"; (cd "$T/work" && git add -A && git commit -qm n && git push -q origin main)
+aborted "package on the never-publish list" "never-publish"
+fresh; good_a; printf 'bump\ta\t1.1_1\nunpublished\tc\t1.0_1\n' > "$T/out/passed.tsv"
+printf '# never\nzzz\n' > "$T/work/tools/never-publish"; (cd "$T/work" && git add -A && git commit -qm n && git push -q origin main)
+out=$(run) && rc=0 || rc=$?
+assert_eq   "an unrelated never-publish list changes nothing" "$rc" "0"
 
 # 4. existing remote branch: that package is skipped, its packages are not published
 fresh; good_a; git -C "$T/work" push -q origin HEAD:refs/heads/autobump/a-1.1

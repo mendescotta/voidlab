@@ -1,0 +1,4 @@
+# Templates CI never publishes, one name per line (subpackages are covered through their template).
+# Tiers decide what is bumped; this list decides what may never reach the public release.
+# nvidia is a proprietary driver: built locally, never published.
+nvidia

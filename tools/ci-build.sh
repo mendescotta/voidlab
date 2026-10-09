@@ -15,11 +15,13 @@ if [ "${GITHUB_ACTIONS:-}" != true ] && [ -z "${CI_AUTO_UPDATE_FORCE:-}" ]; then
 	exit 1
 fi
 cd "$(dirname "$(readlink -f "$0")")/.." || exit 1
+. tools/ci-lib.sh
 
 VL=${VOIDLAB_BIN:-./voidlab}
 OUT=${AUTO_UPDATE_OUT:-out}
 LOGDIR=$(mktemp -d)
 log() { printf '=> %s\n' "$*"; }
+tab=$'\t'
 
 if [ -n "${INPUT_PKG:-}" ] && ! [[ $INPUT_PKG =~ ^[a-z0-9][a-z0-9._+-]*$ ]]; then
 	echo "ci-build: invalid package name: $INPUT_PKG" >&2
@@ -98,8 +100,26 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 		continue
 	fi
 
+	# Everything new in repo/ goes into the artifact, including dependencies xbps-src had to build because
+	# the lab is ahead of the release. A dependency owned by another overlay template is recorded as an
+	# `unpublished` entry of that owner (the publish job validates it like any other); one owned by a
+	# never-publish template is dropped; an unknown name is handed over and rejected there.
+	never=$(list_names tools/never-publish)
 	while IFS= read -r f; do
-		[ -n "$f" ] && cp "repo/$f" "$OUT/xbps/"
+		[ -n "$f" ] || continue
+		[[ $f =~ ^(.+)-([0-9][0-9A-Za-z.+~]*_[0-9]+)\.(x86_64|noarch)\.xbps$ ]] || { cp "repo/$f" "$OUT/xbps/"; continue; }
+		dname=${BASH_REMATCH[1]} dvr=${BASH_REMATCH[2]}
+		if grep -qxF -- "$dname" <<<"$(allowed_names "$pkg")"; then cp "repo/$f" "$OUT/xbps/"; continue; fi
+		if downer=$(owner_of "$dname"); then
+			if grep -qxF -- "$downer" <<<"$never"; then log "dependency $f is on the never-publish list: not handed over"; continue; fi
+			cp "repo/$f" "$OUT/xbps/"
+			if ! grep -qE "^unpublished${tab}${downer}${tab}" "$OUT/passed.tsv" 2>/dev/null; then
+				printf 'unpublished\t%s\t%s\n' "$downer" "$dvr" >> "$OUT/passed.tsv"
+				log "dependency built along the way: $downer $dvr"
+			fi
+		else
+			cp "repo/$f" "$OUT/xbps/"
+		fi
 	done < <(comm -13 <(printf '%s\n' "$before") <(repo_list))
 	if [ "$status" = bump ]; then
 		mkdir -p "$OUT/templates/$pkg"

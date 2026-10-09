@@ -45,8 +45,11 @@ package's own declared subpackages at the expected version may be published), op
 passing bump (`<pkg> <version>`) and, for tier `auto`, merges and publishes it. Tier `review` leaves the
 PR open: merge it and the next daily run builds and publishes the merged version. It is the only job with a write token and the
 signing key. A failing package opens or updates one `auto-update failed: <pkg>` issue and never blocks
-the others. Libraries, the toolchain and the session stack are tier `manual`: bump those by hand
-(`./voidlab tiers` lists every template with its tier).
+the others. Tiers decide what is *bumped*: libraries, the toolchain and the session stack are tier
+`manual`, bump those by hand (`./voidlab tiers` lists every template with its tier). *Publishing* is a
+separate rule: any template already on `main` that is newer than the release is published, whatever its
+tier, including dependencies CI had to build along the way (for example `evolution-data-server`, which
+`gnome-shell` needs). Only the names in `tools/never-publish` are excluded.
 `.github/workflows/overlay-report.yml` opens one weekly `Overlay report` issue with the templates
 official Void has caught up with (add the ones that must stay to `tools/keep-overlay.list`) and the
 newer upstream releases that are not auto-updated.
@@ -66,4 +69,4 @@ The steps are ordinary subcommands, so CI and a laptop behave the same:
 
 One-time setup the workflows cannot do themselves: add the repository secret `VOIDLAB_PRIVKEY`
 (the contents of `~/.config/voidlab/privkey.pem`) and allow Actions to create and approve pull
-requests (Settings, Actions, General). nvidia is tier `manual` and is never published.
+requests (Settings, Actions, General). nvidia is on `tools/never-publish` and is never published.
