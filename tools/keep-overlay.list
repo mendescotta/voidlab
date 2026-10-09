@@ -4,10 +4,8 @@
 # `name  # reason` per line. The reason is shown in packages.md ("Why carried"), so keep it to one short clause.
 # Rebuilt against our newer libraries: Void's binary links different sonames
 # (checked 2026-10-09 by comparing shlib-requires of our package and Void's).
-cheese                    # links libgnome-desktop-3.so.21 (Void's build: .20)
 xdg-desktop-portal-gtk    # links libgnome-desktop-3.so.21 (Void's build: .20)
 xfce4-whiskermenu-plugin  # links libaccountsservice.so.1 (Void's build: .0)
-evolution-data-server     # ICU 78 (Void: 77); built without GTK3, WebKit and GOA
 
 # gtk3-free splits for the GNOME stack: Void's build links gtk3 or gtk4 directly, ours splits it out.
 gcr                       # gcr 3 split into gcr-base (libgck, libgcr-base), no gtk3 in the core

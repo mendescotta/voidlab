@@ -25,7 +25,6 @@ otto review
 # --- review: applications, themes and fonts (no ABI impact)
 eog review
 evince review
-cheese review
 gthumb review
 nautilus review
 sushi review
@@ -48,7 +47,6 @@ gnome-keyring review
 gnome-power-manager review
 gnome-initial-setup review
 gnome-shell-extensions review
-gnome-panel review
 xdg-desktop-portal-gnome review
 xdg-desktop-portal-gtk review
 xdg-user-dirs-gtk review
@@ -56,8 +54,6 @@ xfce4-whiskermenu-plugin review
 adw-gtk3 review
 adwaita-fonts review
 adwaita-icon-theme review
-gruvbox-bibata-cursor-theme review
-gruvbox-material-theme review
 nerd-fonts-cascadiacode review
 pop-fonts review
 
@@ -99,7 +95,6 @@ colord-gtk manual
 gjs manual
 cjs manual
 python3-gobject manual
-evolution-data-server manual
 gnome-online-accounts manual
 gnome-bluetooth manual
 gnome-autoar manual

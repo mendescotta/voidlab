@@ -1,7 +1,7 @@
 # Template file for 'dinit-settingsd'
 pkgname=dinit-settingsd
 version=0.1.0
-revision=1
+revision=2
 build_style=cargo
 depends="dbus polkit tzdata dinit"
 short_desc="Hostname1, timedate1 and locale1 D-Bus services for dinit"
@@ -12,6 +12,7 @@ distfiles="https://github.com/mendescotta/dinit-settingsd/archive/v${version}.ta
 checksum=1b521178637389cc70b8288f8e5fa1ba39e7e3acd1483f00df2f42ff4d507bf7
 # same D-Bus names, ctl symlinks and polkit actions as runit-settingsd
 conflicts="runit-settingsd>=0"
+provides="freedesktop-locale1-0_1"
 
 do_install() {
 	vinstall target/${RUST_TARGET}/release/dinit-settingsd 755 usr/libexec
