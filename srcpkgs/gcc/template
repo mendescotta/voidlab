@@ -58,14 +58,17 @@ depends="binutils libgcc-devel-${version}_${revision}
 checkdepends="dejagnu"
 subpackages="libgcc libgomp libgomp-devel libatomic libatomic-devel"
 
+# Languages: c, c++, fortran (openblas needs libgfortran) and lto. Ada (-o ada), D and Go (_have_gdc,
+# _have_gccgo) and Objective-C are off: nothing in the stack uses them, and Ada alone needs an installed
+# gcc-ada to bootstrap and adds a large share of the build time. Flip the switches to bring them back.
 build_options="ada gnatboot"
-build_options_default="ada"
+build_options_default=""
 desc_option_ada="Enable Ada build"
 desc_option_gnatboot="Enable Ada bootstrap using adacore.com binaries"
 
-_have_gccgo=yes
+_have_gccgo=no
 _have_libquadmath=no
-_have_gdc=yes
+_have_gdc=no
 _old_musl=no
 
 case "$XBPS_TARGET_MACHINE" in
@@ -101,7 +104,6 @@ fi
 
 if [ "$CHROOT_READY" ]; then
 	subpackages+=" gcc-fortran libgfortran-devel libgfortran"
-	subpackages+=" gcc-objc gcc-objc++ libobjc-devel libobjc"
 	if [ "$_have_libquadmath" = "yes" ]; then
 		subpackages+=" libquadmath libquadmath-devel"
 	fi
@@ -288,13 +290,13 @@ do_configure() {
 
 		_args+=" --host=$XBPS_CROSS_TRIPLET"
 		_args+=" --with-build-sysroot=${XBPS_CROSS_BASE}"
-		_langs="c,c++,objc,obj-c++,fortran,lto"
+		_langs="c,c++,fortran,lto"
 	elif [ -z "$CHROOT_READY" ]; then
 		export LD_LIBRARY_PATH="${XBPS_MASTERDIR}/usr/lib${XBPS_TARGET_WORDSIZE}"
 		_args+=" --build=${_triplet}"
 		_langs="c,c++,lto"
 	else
-		_langs="c,c++,objc,obj-c++,fortran,lto"
+		_langs="c,c++,fortran,lto"
 		_args+=" --build=${_triplet}"
 	fi
 
