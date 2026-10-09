@@ -1,13 +1,14 @@
 # Template file for 'cosmic-settings-daemon'
 pkgname=cosmic-settings-daemon
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace"
 hostmakedepends="pkg-config just"
 makedepends="clang22-devel eudev-libudev-devel libinput-devel geoclue2-devel pulseaudio-devel pipewire-devel openssl-devel libxkbcommon-devel"
-depends="acpid alsa-utils cosmic-sound-theme geoclue2 dbus-libs eudev-libudev lame libinput libvarlink libxkbcommon libpulseaudio libsndfile libxcb libasyncns libflac libvorbis libogg libmpg123 libXau libXdmcp opus playerctl wireplumber xdg-utils"
+depends="acpid alsa-utils cosmic-sound-theme geoclue2 libvarlink playerctl
+ wireplumber xdg-utils"
 short_desc="COSMIC settings daemon"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"

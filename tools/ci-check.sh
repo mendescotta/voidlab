@@ -3,8 +3,9 @@
 # runs the test suite. Never builds, never needs a token or a key, so it is safe for fork PRs too.
 #   1. xlint on changed templates; findings must be listed in tools/xlint-known.txt (path: message)
 #   2. changed templates do not hardcode their own version in distfiles/changelog/homepage
-#   3. added or changed patches state a reason (a `Why:` line or a git-format `Subject:`)
-#   4. tools/*.sh and ./voidlab parse; tests/test-*.sh pass (skip with CHECK_SKIP_TESTS=1)
+#   3. no -devel package in the runtime depends of a template
+#   4. added or changed patches state a reason (a `Why:` line or a git-format `Subject:`)
+#   5. tools/*.sh and ./voidlab parse; tests/test-*.sh pass (skip with CHECK_SKIP_TESTS=1)
 set -uo pipefail
 cd "${CHECK_ROOT:-$(dirname "$(readlink -f "$0")")/..}" || exit 1
 
@@ -48,6 +49,22 @@ if [ ${#templates[@]} -gt 0 ]; then
 		done < <(grep -E '^(distfiles|changelog|homepage)=' "$t")
 	done
 fi
+
+# a *-devel package in runtime depends drags headers and static files onto every install; only a -devel
+# subpackage, a compiler that ships them (gcc*) or a meta package may do that
+for t in "${templates[@]}"; do
+	[ -f "$t" ] || continue
+	case $t in srcpkgs/gcc/* | srcpkgs/gcc-*/* | srcpkgs/libgccjit/*) continue ;; esac
+	if awk '
+		/^[A-Za-z0-9._+-]+_package\(\)/ { sub_ = ($1 ~ /^[A-Za-z0-9._+-]*-devel_package/) }
+		/^}/ { sub_ = 0 }
+		/^[[:space:]]*depends[[:space:]]*\+?=/ && !sub_ { capture = 1 }
+		capture { print }
+		capture && /"[[:space:]]*$/ && !/=[[:space:]]*"[^"]*$/ { capture = 0 }
+		capture && /=.*".*"/ { capture = 0 }' "$t" | grep -qE -- '-devel([<>=[:space:]"]|$)'; then
+		bad "$t lists a -devel package in runtime depends (belongs in makedepends)"
+	fi
+done
 
 for p in "${patches[@]}"; do
 	[ -f "$p" ] || continue

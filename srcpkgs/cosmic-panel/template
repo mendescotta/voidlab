@@ -1,13 +1,13 @@
 # Template file for 'cosmic-panel'
 pkgname=cosmic-panel
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace"
 hostmakedepends="pkg-config just python3 $(vopt_if sccache "rust-sccache")"
 makedepends="libxkbcommon-devel libgbm-devel"
-depends="libxkbcommon wayland"
+depends="wayland"
 short_desc="XDG Shell Wrapper Panel for COSMIC"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only AND MPL-2.0"

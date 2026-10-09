@@ -1,13 +1,13 @@
 # Template file for 'cosmic-comp'
 pkgname=cosmic-comp
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace --no-default-features --features logind"
 hostmakedepends="pkg-config just"
 makedepends="eudev-libudev-devel libseat-devel libxkbcommon-devel libinput-devel pixman-devel libgbm-devel libdisplay-info-devel"
-depends="elogind eudev-libudev expat fontconfig libxkbcommon libdisplay-info libgbm libseat libinput libgcc libdrm libelogind libevdev libwacom libcap libgudev libffi libpcre2 libxcb mtdev pixman wayland"
+depends="elogind fontconfig wayland"
 short_desc="Wayland compositor of pop-os cosmic shell"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"

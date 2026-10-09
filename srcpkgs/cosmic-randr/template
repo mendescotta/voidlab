@@ -1,12 +1,11 @@
 # Template file for 'cosmic-randr'
 pkgname=cosmic-randr
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace"
 hostmakedepends="just $(vopt_if sccache "rust-sccache")"
-depends="wayland"
 short_desc="Display and configure wayland display outputs"
 maintainer="Bella109 <belladev109@proton.me>"
 license="MPL-2.0"
