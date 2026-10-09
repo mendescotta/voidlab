@@ -106,6 +106,13 @@ cmd_sync() {
 	fi
 }
 
+# rindex_add <file>...: index packages oldest version first. xbps-rindex -f keeps the LAST file of a
+# package, and a plain glob sorts _10 before _9, which indexed the older revision and then removed the newer.
+rindex_add() {
+	local files
+	mapfile -t files < <(printf '%s\n' "$@" | sort -V)
+	XBPS_ARCH=$ARCH xbps-rindex -f -a "${files[@]}" >/dev/null
+}
 index_repo() {
 	local marker=$1 f
 	mkdir -p "$REPO"
@@ -116,7 +123,7 @@ index_repo() {
 	set -- "$REPO"/*.xbps
 	shopt -u nullglob
 	[ $# -gt 0 ] || return 0
-	XBPS_ARCH=$ARCH xbps-rindex -f -a "$@" >/dev/null
+	rindex_add "$@"
 	XBPS_ARCH=$ARCH xbps-rindex -r "$REPO" >/dev/null
 }
 
@@ -387,7 +394,7 @@ cmd_pull() {
 	done
 	shopt -u nullglob
 	if [ ${#new[@]} -gt 0 ]; then
-		XBPS_ARCH=$ARCH xbps-rindex -f -a "${new[@]}" >/dev/null
+		rindex_add "${new[@]}"
 		XBPS_ARCH=$ARCH xbps-rindex -r "$REPO" >/dev/null
 	fi
 	echo "=> pulled ${#new[@]} packages"
