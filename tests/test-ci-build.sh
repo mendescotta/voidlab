@@ -93,6 +93,11 @@ assert_no   "an unknown package file is not handed over (it would abort the publ
 # a dependency built at another version than its template on main is dropped, not passed on
 echo x > /dev/null
 assert_eq   "the built package itself is one entry" "$(grep -c "${tab}a${tab}" "$W/out/passed.tsv" || true)" "1"
+# a package that was already recorded as someone's dependency and is then built on its own: one entry (the
+# publish job rejects a duplicate and the whole run is lost)
+printf 'bump\ta\t1.0_1\t1.1\nunpublished\tdep\t1.0_1\t0.9_1\n' > "$T/plan"
+run >/dev/null
+assert_eq   "a dependency that is also in the plan gets one entry" "$(grep -c "${tab}dep${tab}" "$W/out/passed.tsv" || true)" "1"
 rm -f "$T/deps"
 
 # a bump whose autobump branch already exists on origin is not rebuilt

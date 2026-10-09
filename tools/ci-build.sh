@@ -130,6 +130,8 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 		mkdir -p "$OUT/templates/$pkg"
 		cp "srcpkgs/$pkg/template" "$OUT/templates/$pkg/template"
 	fi
+	# its own entry replaces one recorded earlier when it was built as another package's dependency
+	awk -F'\t' -v p="$pkg" '$2 != p' "$OUT/passed.tsv" > "$OUT/passed.tsv.new" && mv "$OUT/passed.tsv.new" "$OUT/passed.tsv"
 	printf '%s\t%s\t%s\n' "$status" "$pkg" "$ver" >> "$OUT/passed.tsv"
 done 3<<<"$plan"
 git reset -q --hard </dev/null
