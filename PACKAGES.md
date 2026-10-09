@@ -62,7 +62,6 @@ Tier is the auto-update tier (see docs/ci.md). ⬆ marks a newer upstream releas
 | eog | 50.3_1 | 50.0_1 | 50.3 | review | newer than Void |
 | eudev | 3.2.15_1 | 3.2.14_2 | 3.2.15 | manual | newer than Void |
 | evince | 48.4_1 | 48.1_1 | 48.4 | review | newer than Void |
-| evolution-data-server | 3.56.2_6 | 3.56.2_4 | 3.62.1 ⬆ | manual | ICU 78 (Void: 77); built without GTK3, WebKit and GOA |
 | file-roller | 44.7_1 | 44.5_1 | 44.7 | auto | newer than Void |
 | gcc | 16.2.1+20260926_1 | 14.2.1+20250405_4 | 16.2.1+20260926 | manual | newer than Void |
 | gcc-multilib | 16.2.1+20260926_1 | 14.2.1+20250405_1 | 16.2.1+20260926 | manual | newer than Void |
