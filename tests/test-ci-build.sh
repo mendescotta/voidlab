@@ -39,7 +39,7 @@ printf '#!/bin/sh\necho "$*" >> "%s/gh.log"\nexit 0\n' "$T" > "$T/bin/gh"; chmod
 export PATH=$T/bin:$PATH VOIDLAB_BIN=$T/vl GH_TOKEN=gh-token-value VOIDLAB_PRIVKEY=PRIVATE-KEY-LINE1
 run() { (cd "$W" && CI_AUTO_UPDATE_FORCE=1 AUTO_UPDATE_OUT=$W/out AUTO_UPDATE_SUMMARY=$T/summary.md bash tools/ci-build.sh) 2>&1; }
 
-out=$(cd "$W" && bash tools/ci-build.sh 2>&1 || true)
+out=$(cd "$W" && env -u GITHUB_ACTIONS bash tools/ci-build.sh 2>&1 || true)
 assert_grep "refuses to run outside GitHub Actions" 'refusing to run outside GitHub Actions' <(echo "$out")
 
 printf 'bump\ta\t1.0_1\t1.1\nbump\tb\t1.0_1\t2.0\nunpublished\tc\t1.0_1\t0.9_1\nfail\td\t-\tno overlay template\ncurrent\te\t1.0_1\t-\n' > "$T/plan"
