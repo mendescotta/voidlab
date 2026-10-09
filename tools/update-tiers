@@ -1,0 +1,160 @@
+# How auto-update treats each template: `<pkg> <tier>`, `#` comments. Unlisted templates are `notify`
+# (reported weekly, never bumped). Run `./voidlab tiers` to see every template with its tier.
+#   auto    bump, build, test, squash-merge, publish. Leaf apps with no ABI impact only.
+#   review  bump, build, test, open a PR and leave it. Merge it and the next daily run publishes it.
+#   manual  never bumped by CI: toolchain, libraries other packages link against, session and boot
+#           components, held sets. Bump by hand (they need coordinated rebuilds). Reported weekly.
+# nvidia is `manual` and is never published. Meta packages have no source and stay unlisted.
+
+# --- auto
+baobab auto
+gnote auto
+file-roller auto
+python3-xapp auto
+pix auto
+xviewer auto
+
+# --- review: our own projects
+caerus review
+voyage review
+vessel review
+voidhw review
+runit-settingsd review
+dinit-settingsd review
+otto review
+dynamod review
+# --- review: applications, themes and fonts (no ABI impact)
+eog review
+evince review
+cheese review
+gthumb review
+nautilus review
+sushi review
+tecla review
+yelp review
+zenity review
+totem-pl-parser review
+gnome-calculator review
+gnome-calendar review
+gnome-clocks review
+gnome-console review
+gnome-contacts review
+gnome-maps review
+gnome-software review
+gnome-system-monitor review
+gnome-text-editor review
+gnome-user-docs review
+gnome-backgrounds review
+gnome-keyring review
+gnome-power-manager review
+gnome-initial-setup review
+gnome-shell-extensions review
+gnome-panel review
+xdg-desktop-portal-gnome review
+xdg-desktop-portal-gtk review
+xdg-user-dirs-gtk review
+xfce4-whiskermenu-plugin review
+adw-gtk3 review
+adwaita-fonts review
+adwaita-icon-theme review
+gruvbox-bibata-cursor-theme review
+gruvbox-material-theme review
+nerd-fonts-cascadiacode review
+pop-fonts review
+
+# --- manual: toolchain, init and boot
+gcc manual
+gcc-multilib manual
+libgccjit manual
+elogind manual
+eudev manual
+pam manual
+dinit-void manual
+sd-tools manual
+lightdm manual
+accountsservice manual
+nvidia manual
+# --- manual: libraries and the GNOME session stack (coordinated rebuilds)
+glib manual
+glibmm manual
+glibmm2.68 manual
+gtk4 manual
+gtkmm manual
+gtkmm4 manual
+atkmm manual
+pango manual
+pangomm manual
+gdk-pixbuf manual
+gsettings-desktop-schemas manual
+dconf manual
+at-spi2-core manual
+libadwaita manual
+libportal manual
+libsecret manual
+gcr manual
+libnma manual
+libdecor manual
+libmanette manual
+libwnck manual
+libgsf manual
+colord-gtk manual
+gjs manual
+cjs manual
+python3-gobject manual
+evolution-data-server manual
+gnome-online-accounts manual
+gnome-bluetooth manual
+gnome-autoar manual
+gspell manual
+gst-plugins-good1 manual
+ibus manual
+localsearch manual
+tinysparql manual
+gvfs manual
+xapp manual
+gnome-desktop manual
+gnome-session manual
+gnome-settings-daemon manual
+gnome-control-center manual
+gnome-shell manual
+mutter manual
+gdm manual
+# --- manual: held sets and desktops bumped as a whole
+budgie-control-center manual
+budgie-desktop manual
+budgie-screensaver manual
+budgie-session manual
+cinnamon manual
+cinnamon-session manual
+cinnamon-settings-daemon manual
+pop-launcher manual
+xdg-desktop-portal-cosmic manual
+cosmic-applets manual
+cosmic-applibrary manual
+cosmic-bg manual
+cosmic-comp manual
+cosmic-edit manual
+cosmic-files manual
+cosmic-greeter manual
+cosmic-icons manual
+cosmic-idle manual
+cosmic-initial-setup manual
+cosmic-launcher manual
+cosmic-monitor manual
+cosmic-notifications manual
+cosmic-osd manual
+cosmic-osk manual
+cosmic-panel manual
+cosmic-player manual
+cosmic-randr manual
+cosmic-screenshot manual
+cosmic-session manual
+cosmic-settings manual
+cosmic-settings-daemon manual
+cosmic-sound-theme manual
+cosmic-store manual
+cosmic-term manual
+cosmic-tweaks manual
+cosmic-viewer manual
+cosmic-wallpapers manual
+cosmic-workspaces-epoch manual

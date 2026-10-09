@@ -19,8 +19,10 @@ KEY=${VOIDLAB_KEY:-$HOME/.config/voidlab/privkey.pem}
 GH_REPO=${VOIDLAB_GH_REPO:-mendescotta/voidlab}
 RELEASE_TAG=${VOIDLAB_RELEASE_TAG:-repo}
 UPSTREAM_URL=${VOIDLAB_UPSTREAM_URL:-https://github.com/void-linux/void-packages}
-# Templates `update` may bump on its own; one name per line, `#` comments.
-ALLOW=${VOIDLAB_ALLOW:-$ROOT/tools/auto-update.allow}
+# How each template is updated: `<pkg> <tier>` per line, `#` comments. Tiers: auto (bump, build, merge,
+# publish), review (bump, build, open a PR that you merge), manual (never bumped). Unlisted = notify
+# (reported only).
+TIERS=${VOIDLAB_TIERS:-$ROOT/tools/update-tiers}
 # Templates kept on purpose even when official Void has the same version.
 KEEP=${VOIDLAB_KEEP:-$ROOT/tools/keep-overlay.list}
 OFFICIAL_URL=${VOIDLAB_OFFICIAL_URL:-https://repo-default.voidlinux.org/current}
@@ -202,6 +204,29 @@ overlay_tmpl() {
 	fi
 }
 
+# tier_pairs: validated `pkg tier` lines of $TIERS; a malformed line is an error, never a silent demotion.
+tier_pairs() {
+	[ -f "$TIERS" ] || return 0
+	awk '
+		{ sub(/#.*/, "") }
+		NF == 0 { next }
+		NF != 2 || $2 !~ /^(auto|review|manual)$/ { printf "voidlab: bad line in update-tiers: %s\n", $0 > "/dev/stderr"; bad = 1; next }
+		{ print }
+		END { exit bad }' "$TIERS"
+}
+# tier_names <tier>...: names whose tier is one of those given.
+tier_names() {
+	local pairs
+	pairs=$(tier_pairs) || return 1
+	awk -v want=" $* " 'index(want, " " $2 " ") { print $1 }' <<<"$pairs"
+}
+cmd_tiers() {
+	local pairs p t
+	declare -A tier
+	pairs=$(tier_pairs) || exit 1
+	while read -r p t; do [ -z "$p" ] || tier[$p]=$t; done <<<"$pairs"
+	for p in $(overlay_names | sort); do printf '%s\t%s\n' "$p" "${tier[$p]:-notify}"; done
+}
 overlay_names() {
 	local e
 	for e in "$ROOT"/srcpkgs/* "$EXTRA_SRCPKGS"/*/; do
@@ -266,7 +291,12 @@ cmd_update() {
 	done
 	need_upstream
 	if [ ${#pkgs[@]} -eq 0 ]; then
-		if [ -n "$all" ]; then mapfile -t pkgs < <(overlay_names); else mapfile -t pkgs < <(list_names "$ALLOW"); fi
+		if [ -n "$all" ]; then
+			mapfile -t pkgs < <(overlay_names)
+		else
+			out=$(tier_names auto review) || exit 1
+			[ -z "$out" ] || mapfile -t pkgs <<<"$out"
+		fi
 	fi
 	cmd_overlay
 	for p in "${pkgs[@]}"; do
@@ -444,5 +474,6 @@ update)  shift; cmd_update "$@" ;;
 test)    shift; cmd_test "$@" ;;
 pull)    shift; cmd_pull "$@" ;;
 redundant) shift; cmd_redundant "$@" ;;
-*) echo "usage: voidlab {sync|overlay|build <pkg>...|status|update|test <pkg>...|pull|redundant|keygen|publish}" >&2; exit 2 ;;
+tiers)   shift; cmd_tiers "$@" ;;
+*) echo "usage: voidlab {sync|overlay|build <pkg>...|status|update|test <pkg>...|pull|redundant|tiers|keygen|publish}" >&2; exit 2 ;;
 esac
