@@ -19,7 +19,6 @@ Tier is the auto-update tier (see docs/ci.md). ⬆ marks a newer upstream releas
 | baobab | 50.0_1 | 48.0_1 | 50.0 | auto | newer than Void |
 | base-system-dinit | 0.1_5 |  | 0.1 | notify | not in Void |
 | caerus | 0.7.1_1 |  | 0.7.1 | review | not in Void |
-| cheese | 44.1_6 | 44.1_4 | 44.1 | review | links libgnome-desktop-3.so.21 (Void's build: .20) |
 | cinnamon | 6.6.9_2 | 6.6.7_1 | 6.6.9 | manual | newer than Void |
 | cinnamon-session | 6.6.4_1 | 6.6.3_1 | 6.6.4 | manual | newer than Void |
 | cinnamon-settings-daemon | 6.6.4_1 | 6.6.3_1 | 6.6.4 | manual | newer than Void |
@@ -90,7 +89,6 @@ Tier is the auto-update tier (see docs/ci.md). ⬆ marks a newer upstream releas
 | gnome-keyring | 51.1_2 | 48.0_1 | 51.1 | review | newer than Void |
 | gnome-maps | 51.1_1 | 50.1_3 | 51.1 | review | newer than Void |
 | gnome-online-accounts | 3.58.1_1 | 3.54.4_1 | 3.58.1 | manual | newer than Void |
-| gnome-panel | 3.58.1_1 | 3.52.0_1 | 3.58.1 | review | newer than Void |
 | gnome-power-manager | 50.0_1 | 43.0_1 | 50.0 | review | newer than Void |
 | gnome-session | 51.0_10 | 48.0_1 | 51.0 | manual | newer than Void |
 | gnome-settings-daemon | 51.0_1 | 48.1_2 | 51.0 | manual | newer than Void |
@@ -101,8 +99,6 @@ Tier is the auto-update tier (see docs/ci.md). ⬆ marks a newer upstream releas
 | gnome-text-editor | 51.0_1 | 50.1_1 | 51.0 | review | newer than Void |
 | gnome-user-docs | 51.0_1 | 48.2_1 | 51.0 | review | newer than Void |
 | gnote | 51.0_1 | 48.1_1 | 51.0 | auto | newer than Void |
-| gruvbox-bibata-cursor-theme | 1.0.0_1 |  | 1.0.0 | review | not in Void |
-| gruvbox-material-theme | 0.20250117_2 |  | 0.20250117 | review | not in Void |
 | gsettings-desktop-schemas | 51.0_1 | 48.0_1 | 51.0 | manual | newer than Void |
 | gspell | 1.14.5_1 | 1.14.2_1 | 1.14.5 | manual | newer than Void |
 | gst-plugins-good1 | 1.28.6_3 | 1.28.6_2 | 1.28.8 ⬆ | manual | GTK3 plugin split into gst-plugins-good1-gtk3 (core links no gtk3 or gstgl) |

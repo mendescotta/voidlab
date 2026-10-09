@@ -11,8 +11,6 @@ srcpkgs/gst-plugins-good1/template: Place qmake_default_version= after checksum=
 
 # TODO: drop wrksrc after an xbps-src extract test (archive top-level dir names already match)
 srcpkgs/caerus/template: wrksrc is deprecated and should not be used
-srcpkgs/gruvbox-bibata-cursor-theme/template: wrksrc is deprecated and should not be used
-srcpkgs/gruvbox-material-theme/template: wrksrc is deprecated and should not be used
 
 # TODO: check whether vlicense is really needed for these common licenses
 srcpkgs/caerus/template: license GPL-3.0-or-later should not be installed
