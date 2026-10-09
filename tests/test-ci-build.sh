@@ -15,7 +15,7 @@ printf "# never\nnv\n" > tools/never-publish
 git add -A; git commit -qm init
 # a pulled release package must be visible to xbps-src, which only reads hostdir/binpkgs
 mkdir -p repo "$T/empty"
-(cd repo && xbps-create -A noarch -n lib-1.0_1 -s t "$T/empty" >/dev/null && XBPS_ARCH=x86_64 xbps-rindex -a lib-1.0_1.noarch.xbps >/dev/null)
+(cd repo && xbps-create -A noarch -n lib-1.0_1 -s t "$T/empty" >/dev/null && xbps-create -A noarch -n a-1.0_1 -s t "$T/empty" >/dev/null && XBPS_ARCH=x86_64 xbps-rindex -a lib-1.0_1.noarch.xbps a-1.0_1.noarch.xbps >/dev/null)
 
 # stub voidlab: plan from $T/plan; build drops a fake package into repo/, fails for b
 cat > "$T/vl" <<STUB
@@ -52,8 +52,9 @@ printf 'bump\ta\t1.0_1\t1.1\nbump\tb\t1.0_1\t2.0\nunpublished\tc\t1.0_1\t0.9_1\n
 run >/dev/null
 assert_grep "syncs"                              '^sync$' "$T/calls.log"
 assert_grep "pulls the release"                  '^pull$' "$T/calls.log"
-assert_file "release packages are seeded into hostdir/binpkgs" "$W/hostdir/binpkgs/lib-1.0_1.noarch.xbps"
-assert_eq   "hostdir/binpkgs is indexed" "$(XBPS_ARCH=x86_64 xbps-query -i -R --repository="$W/hostdir/binpkgs" -p pkgver lib)" "lib-1.0_1"
+assert_file "release packages are seeded into hostdir/binpkgs" "$W/hostdir/binpkgs/a-1.0_1.noarch.xbps"
+assert_eq   "hostdir/binpkgs is indexed" "$(XBPS_ARCH=x86_64 xbps-query -i -R --repository="$W/hostdir/binpkgs" -p pkgver a)" "a-1.0_1"
+assert_no   "a release package no template makes is not seeded (it would make xbps-src rebuild Void's package)" "$W/hostdir/binpkgs/lib-1.0_1.noarch.xbps"
 assert_grep "a is built"                         '^build a$' "$T/calls.log"
 assert_grep "a is tested"                        '^test a$'  "$T/calls.log"
 assert_eq   "b is not tested after a failed build" "$(grep -c '^test b$' "$T/calls.log" || true)" "0"

@@ -38,13 +38,18 @@ mkdir -p "$OUT/templates" "$OUT/xbps" "$OUT/logs"
 : > "$OUT/failed.tsv"
 
 # xbps-src resolves build dependencies from hostdir/binpkgs, and a fresh CI checkout has none of
-# the overlay's own libraries (glib, gtk4, ...) there: seed it from the pulled release.
+# the overlay's own libraries (glib, gtk4, ...) there: seed it from the pulled release. Only what an
+# overlay template still makes: a stale release package of a name only Void builds now (dinit 0.22.1_1)
+# is older than Void's template, so xbps-src would rebuild Void's package from source instead of
+# installing Void's binary.
 seed_binpkgs() {
-	local f
+	local f b
 	shopt -s nullglob
 	mkdir -p hostdir/binpkgs
 	for f in repo/*.xbps; do
-		[ -e "hostdir/binpkgs/${f##*/}" ] || cp "$f" hostdir/binpkgs/
+		b=${f##*/}
+		[[ $b =~ ^(.+)-[0-9][0-9A-Za-z.+~]*_[0-9]+\.(x86_64|noarch)\.xbps$ ]] && owner_of "${BASH_REMATCH[1]}" >/dev/null || continue
+		[ -e "hostdir/binpkgs/$b" ] || cp "$f" hostdir/binpkgs/
 	done
 	set -- hostdir/binpkgs/*.xbps
 	shopt -u nullglob
@@ -55,8 +60,8 @@ repo_list() { (shopt -s nullglob; for f in repo/*.xbps; do echo "${f##*/}"; done
 
 "$VL" sync </dev/null || exit 1
 "$VL" pull </dev/null || exit 1
-seed_binpkgs || exit 1
 name_map_load
+seed_binpkgs || exit 1
 plan=$("$VL" update --check ${INPUT_PKG:+"$INPUT_PKG"} </dev/null) || exit 1
 printf '%s\n' "$plan"
 # human-readable record of everything checked, so "nothing to do" is distinguishable from "did not look";
