@@ -31,6 +31,8 @@ build) echo "build \$2 sees: key=\${VOIDLAB_PRIVKEY:-none} token=\${GH_TOKEN:-no
 	[ "\$2" != b ] || { echo "build log for b: compile error"; exit 1; }
 	ver=\$(awk -F'\t' -v p="\$2" '\$2 == p { print (\$1 == "bump" ? \$4 "_1" : \$3) }' "$T/plan")
 	echo x > "repo/\$2-\$ver.noarch.xbps"
+	# a real package whose metadata the publish job would reject
+	if [ -f "$T/badmeta" ] && [ "\$2" = a ]; then rm -f "repo/a-\$ver.noarch.xbps"; (cd repo && xbps-create -q -A noarch -n "a-\$ver" -s t -P "glibc-9999_1" "$T/empty" >/dev/null && XBPS_ARCH=x86_64 xbps-rindex -a "a-\$ver.noarch.xbps" >/dev/null); fi
 	# a build that also had to build dependencies of other overlay templates
 	if [ -f "$T/deps" ] && [ "\$2" = a ]; then echo x > repo/dep-1.0_1.noarch.xbps; echo x > repo/nv-1.0_1.noarch.xbps; echo x > repo/zzz-1.0_1.noarch.xbps; fi ;;
 esac
@@ -99,6 +101,22 @@ printf 'bump\ta\t1.0_1\t1.1\nunpublished\tdep\t1.0_1\t0.9_1\n' > "$T/plan"
 run >/dev/null
 assert_eq   "a dependency that is also in the plan gets one entry" "$(grep -c "${tab}dep${tab}" "$W/out/passed.tsv" || true)" "1"
 rm -f "$T/deps"
+
+# a package that would be rejected by the publish job fails here, with the reason in its log
+rm -f "$W/repo"/a-1.1_1.* "$W/repo"/c-1.0_1.*
+printf 'bump\ta\t1.0_1\t1.1\nunpublished\tc\t1.0_1\t0.9_1\n' > "$T/plan"; : > "$T/badmeta"
+out=$(run)
+assert_eq   "a package failing the publish checks is a failure" "$(tr '\t\n' ' |' < "$W/out/failed.tsv")" "a 1.1|"
+assert_grep "its log gives the reason"           'declares provides glibc-9999_1' "$W/out/logs/a.log"
+assert_no   "its packages are not handed over"   "$W/out/xbps/a-1.1_1.noarch.xbps"
+assert_eq   "the rest still passes"              "$(tr '\t\n' ' |' < "$W/out/passed.tsv")" "unpublished c 1.0_1|"
+rm -f "$T/badmeta" "$W/repo"/a-1.1_1.*
+
+# the time budget: nothing new is started after it, and that is logged
+printf 'bump\ta\t1.0_1\t1.1\n' > "$T/plan"; : > "$T/calls.log"
+out=$(cd "$W" && CI_AUTO_UPDATE_FORCE=1 AUTO_UPDATE_OUT=$W/out AUTO_UPDATE_BUDGET_MIN=0 bash tools/ci-build.sh 2>&1)
+assert_eq   "no build starts after the budget"   "$(grep -c '^build ' "$T/calls.log" || true)" "0"
+assert_grep "the skip is logged"                 'a is left for the next run' <(echo "$out")
 
 # a bump whose autobump branch already exists on origin is not rebuilt
 git init -q --bare "$T/origin.git"; git -C "$W" remote add origin "$T/origin.git"
