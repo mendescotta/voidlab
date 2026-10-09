@@ -1,0 +1,2 @@
+# pangomm 2.48 and later is the gtkmm 4 series (pangomm2.48); this template is the gtkmm 3 one
+ignore="2.4[89].* 2.[5-9]*"
