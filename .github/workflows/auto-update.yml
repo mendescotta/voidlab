@@ -58,9 +58,14 @@ jobs:
           VOIDLAB_GH_REPO: ${{ github.repository }}
           INPUT_PKG: ${{ inputs.pkg }}
           VOIDLAB_CHROOT_CMD: uchroot
+          AUTO_UPDATE_SUMMARY: /tmp/auto-update-summary.md
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE"
           sudo -Eu builder env HOME=/home/builder bash tools/ci-build.sh
+
+      - name: Job summary
+        if: always()
+        run: cat /tmp/auto-update-summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
