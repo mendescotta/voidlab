@@ -112,13 +112,18 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 		if grep -qxF -- "$dname" <<<"$(allowed_names "$pkg")"; then cp "repo/$f" "$OUT/xbps/"; continue; fi
 		if downer=$(owner_of "$dname"); then
 			if grep -qxF -- "$downer" <<<"$never"; then log "dependency $f is on the never-publish list: not handed over"; continue; fi
+			if [ "$(template_verrev "$downer" 2>/dev/null)" != "$dvr" ]; then
+				log "dependency $f is not the version of its template on main: not handed over"; continue
+			fi
 			cp "repo/$f" "$OUT/xbps/"
 			if ! grep -qE "^unpublished${tab}${downer}${tab}" "$OUT/passed.tsv" 2>/dev/null; then
 				printf 'unpublished\t%s\t%s\n' "$downer" "$dvr" >> "$OUT/passed.tsv"
 				log "dependency built along the way: $downer $dvr"
 			fi
 		else
-			cp "repo/$f" "$OUT/xbps/"
+			# no overlay template makes this (an upstream package xbps-src had to build): it is not ours to publish,
+			# and handing it over would make the publish job abort the whole run
+			log "dependency $f has no overlay template: not handed over"
 		fi
 	done < <(comm -13 <(printf '%s\n' "$before") <(repo_list))
 	if [ "$status" = bump ]; then

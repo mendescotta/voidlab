@@ -97,6 +97,28 @@ for pkg in "${!STATUS[@]}"; do
 	ALLOWED[$pkg]=$(allowed_names "$pkg" | grep -xE "$NAME_RE" || true)
 done
 
+# `unpublished` entries outside the auto and review tiers are only believed when they are a build dependency
+# of something that is being published here: a compromised build job cannot claim arbitrary templates
+need_closure=
+for pkg in "${!STATUS[@]}"; do
+	[ "${STATUS[$pkg]}" = unpublished ] || continue
+	case $(tier_of "$pkg") in auto | review) continue ;; esac
+	[ "$pkg" = "${INPUT_PKG:-}" ] || need_closure=1
+done
+if [ -n "$need_closure" ]; then
+	seeds=()
+	for pkg in "${!STATUS[@]}"; do
+		case $(tier_of "$pkg") in auto | review) seeds+=("$pkg") ;; *) [ "$pkg" != "${INPUT_PKG:-}" ] || seeds+=("$pkg") ;; esac
+	done
+	closure=$(deps_closure "${seeds[@]}")
+	for pkg in "${!STATUS[@]}"; do
+		[ "${STATUS[$pkg]}" = unpublished ] || continue
+		case $(tier_of "$pkg") in auto | review) continue ;; esac
+		[ "$pkg" = "${INPUT_PKG:-}" ] && continue
+		grep -qxF -- "$pkg" <<<"$closure" || die "$pkg is not a build dependency of a package being published"
+	done
+fi
+
 # --- packages
 declare -A OWNER
 shopt -s nullglob

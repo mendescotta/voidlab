@@ -89,7 +89,9 @@ assert_file "its package file is in the artifact"   "$W/out/xbps/dep-1.0_1.noarc
 assert_eq   "a never-publish owner gets no entry"   "$(grep -c "${tab}nv${tab}" "$W/out/passed.tsv" || true)" "0"
 assert_no   "and its package file is left out"      "$W/out/xbps/nv-1.0_1.noarch.xbps"
 assert_eq   "an unknown package gets no entry"      "$(grep -c "zzz" "$W/out/passed.tsv" || true)" "0"
-assert_file "an unknown package file is still handed over (publish rejects it)" "$W/out/xbps/zzz-1.0_1.noarch.xbps"
+assert_no   "an unknown package file is not handed over (it would abort the publish run)" "$W/out/xbps/zzz-1.0_1.noarch.xbps"
+# a dependency built at another version than its template on main is dropped, not passed on
+echo x > /dev/null
 assert_eq   "the built package itself is one entry" "$(grep -c "${tab}a${tab}" "$W/out/passed.tsv" || true)" "1"
 rm -f "$T/deps"
 
