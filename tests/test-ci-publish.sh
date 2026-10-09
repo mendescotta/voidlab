@@ -17,7 +17,7 @@ tmpl_a() { tmpl_p a "$1" "$2"; }
 
 # fresh repo under test (+ bare origin), stub voidlab, gh shim
 fresh() {
-	rm -rf "$T/work" "$T/origin.git" "$T/out"
+	rm -rf "$T/work" "$T/origin.git" "$T/out" "$T/pulled"
 	git init -q --bare "$T/origin.git"
 	mkdir -p "$T/work/tools"; cd "$T/work"; git init -q
 	cp "$HERE/../tools/ci-publish.sh" tools/ 2>/dev/null || true
@@ -33,7 +33,7 @@ cat > "$T/vl" <<STUB
 #!/bin/bash
 echo "\$*" >> "$T/calls.log"
 case \$1 in
-pull) mkdir -p repo ;;
+pull) mkdir -p repo; [ -d "$T/pulled" ] && cp "$T/pulled"/*.xbps repo/ || true ;;
 publish) echo "publish key=\$(stat -c %a "\$VOIDLAB_KEY") first=\$(head -n1 "\$VOIDLAB_KEY") repo=\$(cd repo && ls *.xbps | tr '\n' ' ')" >> "$T/calls.log" ;;
 esac
 exit 0
@@ -230,6 +230,51 @@ assert_grep "auto packages are still published" 'a-1.1_1.noarch.xbps' "$T/calls.
 # a broken tiers file must stop the run before any push
 fresh; good_a; printf 'a auto\nc reveiw\n' > "$T/work/tools/update-tiers"
 aborted "typo in a tier" "bad line in tools/update-tiers"
+
+# 3c. `unpublished` is verified against the release: an already-published version is never re-signed
+fresh; good_a
+mkdir -p "$T/pulled"; (cd "$T/pulled" && xbps-create -A noarch -n c-1.0_1 -s t "$T/empty" >/dev/null)
+out=$(run) && rc=0 || rc=$?
+assert_eq   "claim for a published version: run succeeds" "$rc" "0"
+assert_grep "claim for a published version is ignored" 'already published' <(echo "$out")
+assert_grep "the other package is still published" 'repo=a-1.1_1.noarch.xbps' "$T/calls.log"
+rm -rf "$T/pulled"
+
+# 3d. dispatch: manual is refused, review and unlisted get a PR that stays open
+fresh; good_a; printf 'bump\ta\t1.1_1\n' > "$T/out/passed.tsv"
+printf 'a manual\n' > "$T/work/tools/update-tiers"; (cd "$T/work" && git add -A && git commit -qm m && git push -q origin main)
+out=$(cd "$T/work" && CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out INPUT_PKG=a bash tools/ci-publish.sh 2>&1) && rc=0 || rc=$?
+assert_eq   "dispatching a manual package is refused" "$rc" "1"
+assert_grep "says it is tier manual"            'tier manual' <(echo "$out")
+fresh; good_a; rm -rf "$T/out/templates/a"; mkdir -p "$T/out/templates/r"; printf 'bump\tr\t1.1_1\n' > "$T/out/passed.tsv"
+mkdir -p "$T/work/srcpkgs/r"; tmpl_p r 1.0 $H1 > "$T/work/srcpkgs/r/template"; (cd "$T/work" && git add -A && git commit -qm r && git push -q origin main)
+tmpl_p r 1.1 $H2 > "$T/out/templates/r/template"; rm -f "$T/out/xbps"/*; addpkg r-1.1_1; addpkg r-devel-1.1_1
+: > "$T/gh.log"
+out=$(cd "$T/work" && CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out INPUT_PKG=r bash tools/ci-publish.sh 2>&1) && rc=0 || rc=$?
+assert_eq   "dispatching a review package succeeds" "$rc" "0"
+assert_grep "dispatched review package gets a PR" 'pr create --base main --head autobump/r-1.1' "$T/gh.log"
+assert_eq   "dispatched review package is not merged" "$(grep -c 'pr merge' "$T/gh.log" || true)" "0"
+fresh; good_a; mv "$T/out/templates/a" "$T/out/templates/z"; rm "$T/out/xbps"/*
+tmpl_p z 1.1 $H2 > "$T/out/templates/z/template"; printf 'bump\tz\t1.1_1\n' > "$T/out/passed.tsv"; addpkg z-1.1_1; addpkg z-devel-1.1_1
+: > "$T/gh.log"
+out=$(cd "$T/work" && CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out INPUT_PKG=z bash tools/ci-publish.sh 2>&1) && rc=0 || rc=$?
+assert_grep "dispatched unlisted package gets a PR" 'pr create --base main --head autobump/z-1.1' "$T/gh.log"
+assert_eq   "dispatched unlisted package is not merged" "$(grep -c 'pr merge' "$T/gh.log" || true)" "0"
+
+# 3e. duplicate lines in the tiers file stop the run
+fresh; good_a; printf 'a auto\na review\n' > "$T/work/tools/update-tiers"
+aborted "duplicate package in the tiers file" "duplicate"
+
+# 3f. a PR that cannot be opened must not leave its branch behind (it would block the package forever)
+fresh; good_a
+cat > "$T/bin/gh" <<SHIM
+#!/bin/bash
+echo "\$*" >> "$T/gh.log"
+[ "\$1 \$2" = "pr create" ] && exit 1
+exit 0
+SHIM
+out=$(run) && rc=0 || rc=$?
+assert_eq   "failed PR creation: branch is removed again" "$(git -C "$T/origin.git" branch --list 'autobump/*' | wc -l)" "0"
 
 # 4. existing remote branch: that package is skipped, its packages are not published
 fresh; good_a; git -C "$T/work" push -q origin HEAD:refs/heads/autobump/a-1.1

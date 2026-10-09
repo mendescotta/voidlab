@@ -52,8 +52,8 @@ done < <(find "$BUILD_OUT" -type f)
 # tiers come from the trusted checkout, never from the artifact. auto: merge and publish; review: open the
 # PR and leave it for the owner (the merged version is then built and published as `unpublished`).
 tiers=$(sed -e 's/#.*//' tools/update-tiers 2>/dev/null | awk 'NF')
-badtier=$(awk 'NF != 2 || $2 !~ /^(auto|review|manual)$/' <<<"$tiers")
-[ -z "$badtier" ] || die "bad line in tools/update-tiers: $badtier"
+badtier=$(awk 'NF != 2 || $2 !~ /^(auto|review|manual)$/ || seen[$1]++' <<<"$tiers")
+[ -z "$badtier" ] || die "bad line in tools/update-tiers (malformed or duplicate): $badtier"
 tier_of() { awk -v p="$1" '$1 == p { print $2 }' <<<"$tiers"; }
 declare -A STATUS VERREV ALLOWED
 # fields are split by hand: `read` with a tab IFS collapses empty fields, so a line could be accepted
@@ -72,6 +72,7 @@ while IFS= read -r line; do
 	[ -f "srcpkgs/$pkg/template" ] && [ ! -L "srcpkgs/$pkg" ] || die "no template for $pkg in the repository"
 	case $(tier_of "$pkg") in
 	auto | review) ;;
+	manual) die "$pkg is tier manual: CI never bumps or publishes it" ;;
 	*) [ "$pkg" = "${INPUT_PKG:-}" ] || die "$pkg is not in the auto or review tier" ;;
 	esac
 	if [ "$status" = unpublished ]; then
@@ -246,24 +247,42 @@ for pkg in "${!STATUS[@]}"; do
 		SKIP[$pkg]=1
 		continue
 	fi
-	if [ "$(tier_of "$pkg")" = review ]; then
-		# built and tested, but a human merges it; the next run publishes the merged version
-		gh pr create --base "$BASE" --head "$branch" --title "$pkg $ver" \
-			--body "Bump $pkg to $ver. Built and tested by the auto-update workflow. Tier review: merge to publish; the next daily run builds and publishes the merged version." </dev/null >/dev/null ||
-			log "could not open the PR for $pkg"
-		log "$pkg is tier review: PR left open"
+	# only tier auto is merged by CI; review (and an unlisted package dispatched by hand) is built and tested,
+	# then a human merges the PR and the next run publishes the merged version
+	if [ "$(tier_of "$pkg")" = auto ]; then body="Bump $pkg to $ver. Built and tested by the auto-update workflow."
+	else body="Bump $pkg to $ver. Built and tested by the auto-update workflow. Not merged automatically: merge it and the next daily run builds and publishes the merged version."; fi
+	if ! gh pr create --base "$BASE" --head "$branch" --title "$pkg $ver" --body "$body" </dev/null >/dev/null; then
+		# a pushed branch without a PR would make every later run skip this package
+		log "could not open the PR for $pkg; removing $branch"
+		git push -q origin --delete "$branch" </dev/null || true
 		SKIP[$pkg]=1
 		continue
 	fi
-	if ! gh pr create --base "$BASE" --head "$branch" --title "$pkg $ver" \
-			--body "Bump $pkg to $ver. Built and tested by the auto-update workflow." </dev/null >/dev/null ||
-		! gh pr merge "$branch" --squash --delete-branch --subject "$pkg $ver" --body "" </dev/null >/dev/null; then
+	if [ "$(tier_of "$pkg")" != auto ]; then
+		log "$pkg is not tier auto: PR left open"
+		SKIP[$pkg]=1
+		continue
+	fi
+	if ! gh pr merge "$branch" --squash --delete-branch --subject "$pkg $ver" --body "" </dev/null >/dev/null; then
 		log "PR for $pkg did not merge; not publishing it"
 		SKIP[$pkg]=1
 	fi
 done
 
 "$VL" pull </dev/null || die "cannot pull the release"
+# `unpublished` is the artifact's claim; verify it against the release. A version that is already published
+# is never signed again from an artifact, so a compromised build job cannot swap the binaries of a package
+# that has no merged-but-unreleased template.
+shopt -s nullglob
+for pkg in "${!STATUS[@]}"; do
+	[ "${STATUS[$pkg]}" = unpublished ] || continue
+	published=(repo/"$pkg-${VERREV[$pkg]}".*.xbps)
+	if [ ${#published[@]} -gt 0 ]; then
+		log "$pkg ${VERREV[$pkg]} is already published: ignoring the artifact"
+		SKIP[$pkg]=1
+	fi
+done
+shopt -u nullglob
 accepted=()
 shopt -s nullglob
 for f in "$BUILD_OUT"/xbps/*.xbps; do
