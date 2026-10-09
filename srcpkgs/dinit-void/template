@@ -1,7 +1,7 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 version=0.99.25
-revision=9
+revision=10
 # Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
 # device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
 # dbus, elogind, polkitd, NetworkManager, wpa_supplicant, acpid, display managers, chronyd).
@@ -11,19 +11,24 @@ build_style=meson
 configure_args="-Ddefault-path-env=/usr/bin"
 hostmakedepends="pkg-config"
 makedepends="libkmod-devel dbus-devel"
-# dinit-void is the exclusive-init package (ISOs, vessel installs): the five
-# commands that collide with runit-void plus a dependency on -core. -core holds
-# everything else and installs next to runit-void, to boot dinit from a second
-# boot entry on a runit system (see dinit-alongside-init).
-depends="dinit-void-core>=${version}_${revision}"
+# Two flavours of the same files:
+#  - dinit-void: the dinit distro (ISOs, vessel installs). Standalone and dinit only: it owns
+#    /usr/bin/{init,shutdown,halt,poweroff,reboot} like any other dinit distro.
+#  - dinit-void-core: the lab flavour for a runit host. It leaves out those commands and ships the
+#    glue to boot dinit from a second boot entry (see dinit-alongside-init, tools/dinit-alongside).
+# They conflict; never install both.
+depends="dinit sd-tools kmod eudev kbd util-linux"
+make_dirs="
+ /etc/dinit.d/boot.d 0755 root root
+ /usr/lib/dinit.d/boot.d 0755 root root"
 short_desc="Dinit early-boot services with Void Linux integration"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause"
 homepage="https://github.com/chimera-linux/dinit-chimera"
 distfiles="https://github.com/chimera-linux/dinit-chimera/archive/v${version}.tar.gz"
 checksum=777dbee5a69f96a1a4cd812c7fa3dce62a7247a4be99420832a778e548c357f7
-# ships /usr/bin/init and owns /usr/bin/{shutdown,halt,poweroff,reboot} like runit-void
-conflicts="runit-void>=0"
+# owns /usr/bin/{init,shutdown,halt,poweroff,reboot} like runit-void
+conflicts="runit-void>=0 dinit-void-core>=0"
 
 post_build() {
 	${CC} ${CFLAGS} ${LDFLAGS} -o dbus-wait-for ${FILESDIR}/dbus-wait-for.c \
@@ -60,16 +65,6 @@ EOF2
 		ln -s dinit-$c ${DESTDIR}/usr/bin/$c
 	done
 
-	# init is a symlink: -core keeps the binary under a name that does not
-	# collide with runit-void's /usr/bin/init
-	mv ${DESTDIR}/usr/bin/init ${DESTDIR}/usr/libexec/dinit-init
-	ln -s ../libexec/dinit-init ${DESTDIR}/usr/bin/init
-
-	# booting dinit from a second entry on a runit system
-	vinstall ${FILESDIR}/dinit-alongside-init 755 usr/libexec
-	vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside shutdown
-	vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside halt
-
 	vmkdir etc/dinit.d
 	for c in 1 2 3 4 5 6 S0; do
 		sed "s/@TTY@/tty$c/g" ${FILESDIR}/agetty.in \
@@ -84,24 +79,29 @@ EOF2
 }
 
 dinit-void-core_package() {
-	short_desc+=" - everything except the files that collide with runit-void"
+	short_desc+=" - lab flavour for a runit host (no init or power commands)"
 	depends="dinit sd-tools kmod eudev kbd util-linux"
-	# service enablement dirs (the boot/system targets' waits-for.d); tmpfiles
-	# only creates them at boot, too late for tools that enable services offline
+	conflicts="dinit-void>=0"
 	make_dirs="
 	 /etc/dinit.d/boot.d 0755 root root
 	 /usr/lib/dinit.d/boot.d 0755 root root"
 	pkg_install() {
-		local f
-		vmove etc/dinit.d
-		vmove usr/lib
-		vmove usr/libexec
-		vmove usr/share
-		for f in ${DESTDIR}/usr/bin/*; do
-			case "${f##*/}" in
-			init|shutdown|halt|poweroff|reboot) ;;
-			*) vmove usr/bin/${f##*/} ;;
-			esac
+		local f d
+		# a copy of everything dinit-void ships, minus what runit-void owns
+		for d in etc usr; do
+			vmkdir $d
+			cp -a ${DESTDIR}/$d/. ${PKGDESTDIR}/$d/
 		done
+		for f in shutdown halt poweroff reboot; do
+			rm -f ${PKGDESTDIR}/usr/bin/$f
+		done
+		rm -f ${PKGDESTDIR}/usr/bin/init ${PKGDESTDIR}/etc/profile.d/editor.sh
+		# init keeps its binary under a name that does not collide with runit-void's /usr/bin/init
+		vmkdir usr/libexec
+		cp -a ${DESTDIR}/usr/bin/init ${PKGDESTDIR}/usr/libexec/dinit-init
+		# booting dinit from a second entry on a runit system
+		vinstall ${FILESDIR}/dinit-alongside-init 755 usr/libexec
+		vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside shutdown
+		vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside halt
 	}
 }
