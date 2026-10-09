@@ -42,7 +42,7 @@ the `publish` job as an artifact. `publish` runs on a fresh runner from the trus
 that artifact as untrusted data (`tools/ci-publish.sh` aborts the whole run unless it has the expected
 shape: only the version, revision and checksum lines of a template may change, and only the
 package's own declared subpackages at the expected version may be published), opens one PR per
-passing bump (`<pkg> <version>`) and, for tier `auto`, merges and publishes it. Tier `review` leaves the
+passing bump (`<pkg> <version>`) and, for tier `auto`, merges and publishes it. At most one bump PR per package is open at a time (a new upstream version waits until it is merged or closed). Tier `review` leaves the
 PR open: merge it and the next daily run builds and publishes the merged version. It is the only job with a write token and the
 signing key. A failing package opens or updates one `auto-update failed: <pkg>` issue and never blocks
 the others. Tiers decide what is *bumped*: libraries, the toolchain and the session stack are tier

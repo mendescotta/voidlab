@@ -252,6 +252,14 @@ for pkg in "${!STATUS[@]}"; do
 	branch=autobump/$pkg-$ver
 	git fetch -q origin "$BASE" </dev/null && git switch -q "$BASE" && git reset -q --hard "origin/$BASE" ||
 		{ log "cannot reset to origin/$BASE"; SKIP[$pkg]=1; continue; }
+	# one open bump PR per package: a build job that proposes a new version every night cannot pile them up
+	open_prs=$(gh pr list --state open --json headRefName \
+		--jq "[.[] | select(.headRefName | startswith(\"autobump/$pkg-\"))] | length" </dev/null 2>/dev/null || echo 0)
+	if [ "${open_prs:-0}" -gt 0 ] 2>/dev/null; then
+		log "$pkg already has an open bump PR: skipping"
+		SKIP[$pkg]=1
+		continue
+	fi
 	if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
 		log "$branch already exists, skipping $pkg"
 		SKIP[$pkg]=1

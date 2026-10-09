@@ -43,6 +43,7 @@ cat > "$T/bin/gh" <<SHIM
 echo "\$* [key=\$([ -e "$T/key.pem" ] && echo present || echo absent)]" >> "$T/gh.log"
 [ "\$1 \$2" = "pr merge" ] && git -C "$T/origin.git" update-ref refs/heads/main "refs/heads/\$3"
 case "\$1 \$2" in
+"pr list") cat "$T/open-count" 2>/dev/null || echo 0 ;;
 "issue create"|"issue comment") while [ \$# -gt 0 ]; do [ "\$1" = --body ] && printf '%s' "\$2" > "$T/body.md"; shift; done ;;
 esac
 exit 0
@@ -267,6 +268,7 @@ aborted "duplicate package in the tiers file" "duplicate"
 
 # 3f. a PR that cannot be opened must not leave its branch behind (it would block the package forever)
 fresh; good_a
+cp "$T/bin/gh" "$T/bin/gh.orig"
 cat > "$T/bin/gh" <<SHIM
 #!/bin/bash
 echo "\$*" >> "$T/gh.log"
@@ -275,6 +277,7 @@ exit 0
 SHIM
 out=$(run) && rc=0 || rc=$?
 assert_eq   "failed PR creation: branch is removed again" "$(git -C "$T/origin.git" branch --list 'autobump/*' | wc -l)" "0"
+cp "$T/bin/gh.orig" "$T/bin/gh"   # the failing shim must not leak into the tests that follow
 
 # 3g. `unpublished` of a package outside the auto/review tiers must be a build dependency of something
 # being published (compromised build jobs cannot claim arbitrary templates); bumps need the tier
@@ -300,6 +303,18 @@ fresh; good_a; printf 'bump\ta\t1.1_1\nunpublished\tc\t1.0_1\n' > "$T/out/passed
 printf '# never\nzzz\n' > "$T/work/tools/never-publish"; (cd "$T/work" && git add -A && git commit -qm n && git push -q origin main)
 out=$(run) && rc=0 || rc=$?
 assert_eq   "an unrelated never-publish list changes nothing" "$rc" "0"
+
+# 3h. one open bump PR per package: a different version does not start a second one
+fresh; good_a; echo 1 > "$T/open-count"
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a package with an open bump PR gets no new branch" "$(git -C "$T/origin.git" branch --list 'autobump/*' | wc -l)" "0"
+assert_eq   "and no new PR"                     "$(grep -c 'pr create' "$T/gh.log" || true)" "0"
+assert_grep "the skip is logged"                'open bump PR' <(echo "$out")
+assert_grep "the other package is still published" 'repo=c-1.0_1.noarch.xbps' "$T/calls.log"
+fresh; good_a; echo 0 > "$T/open-count"
+out=$(run) && rc=0 || rc=$?
+assert_grep "without an open PR the bump goes ahead" 'pr create --base main --head autobump/a-1.1' "$T/gh.log"
+rm -f "$T/open-count"
 
 # 4. existing remote branch: that package is skipped, its packages are not published
 fresh; good_a; git -C "$T/work" push -q origin HEAD:refs/heads/autobump/a-1.1
