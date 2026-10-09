@@ -11,7 +11,16 @@ files=("$W"/*.yml)
 
 for f in "${files[@]}"; do
 	n=${f##*/}
-	assert_eq "$n: no pull_request / workflow_run trigger" "$(grep -cE '^\s*(pull_request|pull_request_target|workflow_run)\b' "$f" || true)" "0"
+	assert_eq "$n: no pull_request_target / workflow_run trigger" "$(grep -cE '^\s*(pull_request_target|workflow_run)\b' "$f" || true)" "0"
+	if [ "$n" = check.yml ]; then
+		# the one fork-reachable workflow: read-only, no secret, no write permission
+		assert_eq "$n: uses no secret"           "$(grep -c 'secrets\.' "$f" || true)" "0"
+		assert_eq "$n: has no write permission"  "$(grep -cE ': write' "$f" || true)" "0"
+		assert_grep "$n: token is read-only"     'contents: read' "$f"
+		assert_eq "$n: never builds or publishes" "$(grep -cE 'ci-build|ci-publish|voidlab (build|publish)|--privileged|upload-artifact' "$f" || true)" "0"
+	else
+		assert_eq "$n: no pull_request trigger"  "$(grep -cE '^\s*pull_request\b' "$f" || true)" "0"
+	fi
 	assert_grep "$n: declares permissions"      '^permissions:' "$f"
 	assert_grep "$n: declares concurrency"      '^concurrency:' "$f"
 	assert_eq "$n: no tab characters"           "$(grep -c $'\t' "$f" || true)" "0"
