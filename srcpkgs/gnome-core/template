@@ -1,7 +1,7 @@
 # Template file for 'gnome-core'
 pkgname=gnome-core
 version=51.0
-revision=5
+revision=6
 metapackage=yes
 short_desc="GNOME meta-package for Void Linux - core components"
 maintainer="Orphaned <orphan@voidlinux.org>"
@@ -11,12 +11,12 @@ homepage="https://www.gnome.org"
 depends="
  adwaita-fonts>=${version}
  gnome-backgrounds>=${version}
- gnome-control-center>=50.4
+ gnome-control-center
  gnome-keyring>=${version}
- gnome-session>=51.0_3
+ gnome-session
  gnome-shell>=${version}
- gvfs>=1.56.1
+ gvfs
  mutter>=${version}
- nautilus>=50.3.1
+ nautilus
  xdg-desktop-portal-gnome>=${version}
  xdg-user-dirs"
