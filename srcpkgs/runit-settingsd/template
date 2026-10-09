@@ -1,7 +1,7 @@
 # Template file for 'runit-settingsd'
 pkgname=runit-settingsd
 version=0.3.0
-revision=2
+revision=3
 build_style=cargo
 depends="dbus polkit tzdata"
 short_desc="Hostname1, timedate1 and locale1 D-Bus services and ctl wrappers"
@@ -12,6 +12,7 @@ distfiles="https://github.com/mendescotta/runit-settingsd/archive/v${version}.ta
 checksum=9a383896b561fb0e10de65d11518246bbc0fd0614088989d5544f7f8c6f8e80e
 replaces="void-settingsd>=0"
 conflicts="dinit-settingsd>=0"
+provides="freedesktop-locale1-0_1"
 
 do_install() {
 	vinstall target/${RUST_TARGET}/release/runit-settingsd 755 usr/libexec

@@ -1,13 +1,13 @@
 # Template file for 'cosmic-initial-setup'
 pkgname=cosmic-initial-setup
 version=1.9.0
-revision=1
+revision=2
 archs="x86_64*"
 _tag=epoch-${version}
 build_style=cargo
 hostmakedepends="pkg-config just"
 makedepends="libxkbcommon-devel libzstd-devel eudev-libudev-devel libinput-devel"
-depends="blocaled cosmic-icons iso-codes polkit"
+depends="virtual?freedesktop-locale1 cosmic-icons iso-codes polkit"
 short_desc="Initial setup for the COSMIC desktop"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"
