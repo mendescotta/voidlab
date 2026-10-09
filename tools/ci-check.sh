@@ -61,7 +61,10 @@ done
 
 if [ -z "${CHECK_SKIP_TESTS:-}" ]; then
 	for t in tests/test-*.sh; do
-		bash "$t" >/dev/null 2>&1 || bad "$t failed"
+		if ! tout=$(bash "$t" 2>&1); then
+			bad "$t failed"
+			printf '%s\n' "$tout" | grep -v '^ok ' | tail -n 15 | sed 's/^/    /'
+		fi
 	done
 fi
 
