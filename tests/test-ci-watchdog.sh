@@ -11,9 +11,10 @@ cat > "$W/gh" <<'X'
 echo "gh $*" >> "$W/calls"
 case "$1 $2" in
 "run list")
-	wf=
-	while [ $# -gt 0 ]; do [ "$1" = --workflow ] && wf=$2; shift; done
-	cat "$W/last-${wf%.yml}" 2>/dev/null || true ;;
+	wf= ev=
+	while [ $# -gt 0 ]; do [ "$1" = --workflow ] && wf=$2; [ "$1" = --event ] && ev=$2; shift; done
+	# --event schedule: the last successful scheduled run; without it: the first run of any kind
+	if [ "$ev" = schedule ]; then cat "$W/last-${wf%.yml}" 2>/dev/null || true; else cat "$W/first-${wf%.yml}" 2>/dev/null || true; fi ;;
 "issue list") cat "$W/open-issue" 2>/dev/null || true ;;
 *) ;;
 esac
@@ -22,7 +23,7 @@ chmod +x "$W/gh"
 export W
 export PATH=$W:$PATH WATCHDOG_NOW=2026-10-09T12:00:00Z GH_REPO=o/r
 
-setup() { rm -f "$W"/last-* "$W/open-issue" "$W/calls"; : > "$W/calls"; }
+setup() { rm -f "$W"/last-* "$W"/first-* "$W/open-issue" "$W/calls"; : > "$W/calls"; }
 run() { bash "$WD" 2>&1; }
 
 # 1. both fresh, no open issue -> nothing created
@@ -48,6 +49,18 @@ echo 2026-10-09T04:30:00Z > "$W/last-auto-update"
 out=$(run) && rc=0 || rc=$?
 assert_eq "never-run overlay-report creates an issue" "$(grep -c 'issue create' "$W/calls" || true)" "1"
 assert_grep "issue mentions overlay-report" 'overlay-report' "$W/calls"
+
+# 3b. a workflow too new to have had a scheduled run is not flagged; one older than the limit is
+setup
+echo 2026-10-09T04:30:00Z > "$W/last-auto-update"
+echo 2026-10-07T10:00:00Z > "$W/first-overlay-report"
+out=$(run) && rc=0 || rc=$?
+assert_eq "a new workflow without a scheduled run yet is not flagged" "$(grep -c 'issue create' "$W/calls" || true)" "0"
+setup
+echo 2026-10-09T04:30:00Z > "$W/last-auto-update"
+echo 2026-09-20T10:00:00Z > "$W/first-overlay-report"
+out=$(run) && rc=0 || rc=$?
+assert_eq "a schedule that never fired within the limit is flagged" "$(grep -c 'issue create' "$W/calls" || true)" "1"
 
 # 4. already an open issue -> edited, not duplicated
 setup
