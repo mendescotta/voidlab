@@ -72,6 +72,11 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 	*) continue ;;
 	esac
 	if [ "$status" = bump ]; then ver=${other}_1; else ver=$ours; fi
+	# a bump whose PR is already open (tier review, or a stuck auto merge) is not rebuilt every night
+	if [ "$status" = bump ] && git ls-remote --exit-code --heads origin "autobump/$pkg-$other" </dev/null >/dev/null 2>&1; then
+		log "autobump/$pkg-$other already exists: skipping $pkg"
+		continue
+	fi
 	log "$status: $pkg $ver"
 
 	git reset -q --hard </dev/null
