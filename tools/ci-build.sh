@@ -7,7 +7,10 @@
 #   templates/<pkg>/template   the bumped template of each passing bump
 #   xbps/*.xbps    packages built in this run
 #   logs/<pkg>.log tail of the log of each failure
-# It hard-resets the work tree between packages, so it refuses to run outside GitHub Actions.
+# Each package also gets the publish job's metadata checks right after it is built, so a package that would
+# be rejected there fails here, with its log. It stops starting new packages after AUTO_UPDATE_BUDGET_MIN
+# minutes (default 280, the job has 340), so what is built is always handed over; the rest is picked up by
+# the next run. It hard-resets the work tree between packages, so it refuses to run outside GitHub Actions.
 set -uo pipefail
 
 if [ "${GITHUB_ACTIONS:-}" != true ] && [ -z "${CI_AUTO_UPDATE_FORCE:-}" ]; then
@@ -19,6 +22,7 @@ cd "$(dirname "$(readlink -f "$0")")/.." || exit 1
 
 VL=${VOIDLAB_BIN:-./voidlab}
 OUT=${AUTO_UPDATE_OUT:-out}
+BUDGET_MIN=${AUTO_UPDATE_BUDGET_MIN:-280}
 LOGDIR=$(mktemp -d)
 log() { printf '=> %s\n' "$*"; }
 tab=$'\t'
@@ -52,6 +56,7 @@ repo_list() { (shopt -s nullglob; for f in repo/*.xbps; do echo "${f##*/}"; done
 "$VL" sync </dev/null || exit 1
 "$VL" pull </dev/null || exit 1
 seed_binpkgs || exit 1
+name_map_load
 plan=$("$VL" update --check ${INPUT_PKG:+"$INPUT_PKG"} </dev/null) || exit 1
 printf '%s\n' "$plan"
 # human-readable record of everything checked, so "nothing to do" is distinguishable from "did not look";
@@ -79,6 +84,10 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 		log "autobump/$pkg-$other already exists: skipping $pkg"
 		continue
 	fi
+	if [ "$SECONDS" -ge $((BUDGET_MIN * 60)) ]; then
+		log "time budget of $BUDGET_MIN minutes used: $pkg is left for the next run"
+		continue
+	fi
 	log "$status: $pkg $ver"
 
 	git reset -q --hard </dev/null
@@ -97,6 +106,23 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 		log "build or test failed: $pkg"
 		printf '%s\t%s\n' "$pkg" "${ver%_*}" >> "$OUT/failed.tsv"
 		tail -n 40 "$LOGDIR/$pkg.log" > "$OUT/logs/$pkg.log"
+		continue
+	fi
+
+	# the publish job's checks (tools/ci-lib.sh pkg_meta_problems), on everything new this build made
+	new=$(comm -13 <(printf '%s\n' "$before") <(repo_list))
+	problems=
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		[[ $f =~ ^(.+)-[0-9][0-9A-Za-z.+~]*_[0-9]+\.(x86_64|noarch)\.xbps$ ]] || continue
+		downer=$(owner_of "${BASH_REMATCH[1]}") || continue
+		problems+=$(pkg_meta_problems repo "$f" "$downer" .upstream/common/shlibs common/shlibs)
+	done <<<"$new"
+	if [ -n "$problems" ]; then
+		log "built, but would be rejected by the publish job: $pkg"
+		printf '%s\n' "$problems"
+		printf '%s\t%s\n' "$pkg" "${ver%_*}" >> "$OUT/failed.tsv"
+		printf 'Built, but the packages do not pass the publish checks (tools/ci-lib.sh pkg_meta_problems):\n%s\n' "$problems" > "$OUT/logs/$pkg.log"
 		continue
 	fi
 
@@ -125,7 +151,7 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 			# and handing it over would make the publish job abort the whole run
 			log "dependency $f has no overlay template: not handed over"
 		fi
-	done < <(comm -13 <(printf '%s\n' "$before") <(repo_list))
+	done <<<"$new"
 	if [ "$status" = bump ]; then
 		mkdir -p "$OUT/templates/$pkg"
 		cp "srcpkgs/$pkg/template" "$OUT/templates/$pkg/template"

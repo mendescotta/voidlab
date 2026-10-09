@@ -25,7 +25,10 @@ new_repo() {
 	  git add -A && git commit -q -m base )
 	: > "$W/xlint.out"; export FAKE_XLINT_OUT=$W/xlint.out
 }
-run() { ( cd "$R" && CHECK_ROOT=$R BASE=main XLINT=$W/xlint CHECK_SKIP_TESTS=1 bash "$CHECK" 2>&1 ); }
+# fake xbps-query: the repository index is $W/index (`[-] name-version_revision  description` lines)
+printf '#!/bin/sh\n[ -f "%s/index" ] && cat "%s/index"\n' "$W" "$W" > "$W/xq"; chmod +x "$W/xq"
+printf '[-] glibc-2.41_1  libc\n[-] foo-1.2_1  foo\n[-] foo-devel-1.2_1  foo\n[-] good-sub-1.0_1  void ships it\n' > "$W/index"
+run() { ( cd "$R" && CHECK_ROOT=$R BASE=main XLINT=$W/xlint XBPS_QUERY=$W/xq CHECK_SKIP_TESTS=1 bash "$CHECK" 2>&1 ); }
 branch() { ( cd "$R" && git checkout -q -b "b$RANDOM" && "$@" && git add -A && git commit -q -m change ); }
 
 # 1. no changes -> passes
@@ -97,9 +100,50 @@ branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "makedepends=\"foo
 out=$(run) && rc=0 || rc=$?
 assert_eq   "-devel in makedepends passes" "$rc" "0"
 new_repo
-branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; printf "good-devel_package() {\n\tdepends=\"\${sourcepkg}>=\${version} foo-devel\"\n}\n" >> srcpkgs/good/template'
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; printf "good-devel_package() {\n\tdepends=\"\${sourcepkg}>=\${version} foo-devel\"\n}\n" >> srcpkgs/good/template; ln -s good srcpkgs/good-devel'
 out=$(run) && rc=0 || rc=$?
 assert_eq   "-devel in a -devel subpackage passes" "$rc" "0"
+
+# 7c. dependencies must exist at a reachable version; new subpackages need their symlink
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "makedepends=\"foo glibc\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "dependencies that exist pass" "$rc" "0"
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "depends=\"libisoburn\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a dependency nobody has fails" "$rc" "1"
+assert_grep "names it" 'depends on libisoburn, which neither' <(echo "$out")
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "depends=\"foo>=1.3\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a floor above every version on offer fails" "$rc" "1"
+assert_grep "says what is on offer" 'needs foo>=1.3, but only 1.2_1' <(echo "$out")
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "depends=\"foo>=1.2 good>=1.1_1\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "reachable floors (repository and overlay) pass" "$rc" "0"
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "hostmakedepends=\"foo \$(vopt_if sccache \"rust-sccache\")\"" >> srcpkgs/good/template; echo "makedepends+=\" musl-only-devel\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "build options and += branches are not checked" "$rc" "0"
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; printf "good-new_package() {\n\tshort_desc=x\n}\ngood-sub_package() {\n\tshort_desc=y\n}\n" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a new subpackage without its symlink fails" "$rc" "1"
+assert_grep "names it" 'subpackage good-new, which Void does not ship' <(echo "$out")
+assert_eq   "a subpackage Void ships needs no symlink here" "$(grep -c 'good-sub' <<<"$out" || true)" "0"
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; printf "good-new_package() {\n\tshort_desc=x\n}\n" >> srcpkgs/good/template; ln -s good srcpkgs/good-new'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "a new subpackage with its symlink passes" "$rc" "0"
+rm -f "$W/index"
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "depends=\"libisoburn\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "without repositories the check is skipped, not failed" "$rc" "0"
+assert_grep "and says so" 'dependency check skipped' <(echo "$out")
+printf '[-] glibc-2.41_1  libc\n' > "$W/index"
 
 # 8. shell syntax errors in tools/ fail
 new_repo
