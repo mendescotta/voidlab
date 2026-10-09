@@ -77,6 +77,16 @@ assert_grep "summary says what passed"            'Passed: a c' "$T/summary.md"
 assert_grep "summary says what failed"            'Failed: b' "$T/summary.md"
 assert_no   "the summary stays out of the artifact" "$W/out/summary.md"
 
+# a bump whose autobump branch already exists on origin is not rebuilt
+git init -q --bare "$T/origin.git"; git -C "$W" remote add origin "$T/origin.git"
+git -C "$W" push -q origin HEAD:refs/heads/autobump/a-1.1
+printf 'bump\ta\t1.0_1\t1.1\nbump\tb\t1.0_1\t2.0\n' > "$T/plan"; : > "$T/calls.log"
+run >/dev/null
+assert_eq   "an existing autobump branch is not rebuilt" "$(grep -c '^build a$' "$T/calls.log" || true)" "0"
+assert_grep "other bumps are still built"        '^build b$' "$T/calls.log"
+assert_eq   "nothing is pushed to origin"        "$(git -C "$T/origin.git" branch --list | wc -l)" "1"
+git -C "$W" remote remove origin
+
 # an explicit package is passed through, and the out dir is rebuilt from scratch
 printf 'current\tz\t1.0_1\t-\n' > "$T/plan"; : > "$T/calls.log"
 (cd "$W" && CI_AUTO_UPDATE_FORCE=1 AUTO_UPDATE_OUT=$W/out INPUT_PKG=z bash tools/ci-build.sh >/dev/null 2>&1)
