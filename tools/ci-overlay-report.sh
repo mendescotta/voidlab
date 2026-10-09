@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # Weekly report for .github/workflows/overlay-report.yml: one issue listing overlay templates that
 # official Void has caught up with (prefer official) and newer upstream releases that are not on
-# the auto-update allowlist. Opens the issue, or edits the open one.
+# the auto and review tiers (those are bumped by auto-update: auto merges, review opens a PR). Opens the issue, or edits the open one.
 set -uo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.." || exit 1
 
 VL=${VOIDLAB_BIN:-./voidlab}
-ALLOW=${VOIDLAB_ALLOW:-tools/auto-update.allow}
+TIERS=${VOIDLAB_TIERS:-tools/update-tiers}
 export GH_REPO=${GH_REPO:-${GITHUB_REPOSITORY:-}}
 
 "$VL" sync </dev/null || exit 1
 red=$("$VL" redundant </dev/null) || exit 1
 upd=$("$VL" update --all </dev/null) || exit 1
-allow=$(sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$ALLOW" 2>/dev/null | awk 'NF')
+tiers=$(sed -e 's/#.*//' "$TIERS" 2>/dev/null | awk 'NF == 2 { print $1, $2 }')
+tier_of() { awk -v p="$1" '$1 == p { print $2 }' <<<"$tiers"; }
 
 rows=$(awk -F'\t' '$1 == "bump" { printf "%s\t%s\t%s\n", $2, $3, $4 }' <<<"$upd" |
 	while IFS=$'\t' read -r p o n; do
-		grep -qxF "$p" <<<"$allow" || printf '| %s | %s | %s |\n' "$p" "$o" "$n"
+		t=$(tier_of "$p")
+		case $t in auto | review) ;; *) printf '| %s | %s | %s | %s |\n' "$p" "${t:-notify}" "$o" "$n" ;; esac
 	done)
 
 body=$(mktemp)
@@ -36,13 +38,13 @@ body=$(mktemp)
 	echo '## New upstream releases (not auto-updated)'
 	echo
 	if [ -n "$rows" ]; then
-		echo 'Packages outside `tools/auto-update.allow` with a newer stable upstream release. Libraries and stack packages usually need coordinated rebuilds, so bump them by hand, or add a leaf app to the allowlist.'
+		echo 'Packages with a newer stable upstream release that auto-update does not touch (tier `manual`, or not in `tools/update-tiers`). Libraries and stack packages usually need coordinated rebuilds, so bump them by hand, or give a leaf app the `review` or `auto` tier.'
 		echo
-		echo '| package | ours | upstream |'
-		echo '|---|---|---|'
+		echo '| package | tier | ours | upstream |'
+		echo '|---|---|---|---|'
 		printf '%s\n' "$rows"
 	else
-		echo 'Nothing: no package outside the allowlist has a newer stable release.'
+		echo 'Nothing: no package outside the auto and review tiers has a newer stable release.'
 	fi
 } > "$body"
 

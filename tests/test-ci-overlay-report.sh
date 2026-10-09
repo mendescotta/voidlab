@@ -7,7 +7,7 @@ tab=$'\t'
 
 W=$T/work; mkdir -p "$W/tools" "$T/bin"
 cp "$HERE/../tools/ci-overlay-report.sh" "$W/tools/" 2>/dev/null || true
-printf '# leaf apps\na\n' > "$W/tools/auto-update.allow"
+printf '# leaf apps\na auto\nr review\nm manual\n' > "$W/tools/update-tiers"
 
 cat > "$T/vl" <<STUB
 #!/bin/bash
@@ -33,14 +33,16 @@ export PATH=$T/bin:$PATH VOIDLAB_BIN=$T/vl
 run() { (cd "$W" && bash tools/ci-overlay-report.sh) 2>&1; }
 
 printf 'revbump\tcheese\t44.1_5\t44.1_4\nbehind\told\t1.0_1\t2.0_1\n' > "$T/redundant"
-printf 'bump\ta\t1.0_1\t1.1\nbump\tglib\t2.90.0_1\t2.91.0\ncurrent\tb\t1.0_1\t-\nfail\tx\t-\tno overlay template\n' > "$T/update"
+printf 'bump\ta\t1.0_1\t1.1\nbump\tr\t1.0_1\t1.1\nbump\tm\t3.0_1\t3.1\nbump\tglib\t2.90.0_1\t2.91.0\ncurrent\tb\t1.0_1\t-\nfail\tx\t-\tno overlay template\n' > "$T/update"
 : > "$T/calls.log"; : > "$T/gh.log"
 run >/dev/null
 assert_grep "syncs upstream first"              '^sync$' "$T/calls.log"
 assert_grep "creates the issue when none is open" 'issue create --title Overlay report --label overlay-report' "$T/gh.log"
 assert_grep "lists a redundant package"         '^| revbump | cheese | 44.1_5 | 44.1_4 |$' "$T/body.md"
 assert_grep "lists a package behind official"   '^| behind | old | 1.0_1 | 2.0_1 |$' "$T/body.md"
-assert_grep "lists a stack bump"                '^| glib | 2.90.0_1 | 2.91.0 |$' "$T/body.md"
+assert_grep "lists an unlisted bump as notify"   '^| glib | notify | 2.90.0_1 | 2.91.0 |$' "$T/body.md"
+assert_grep "lists a manual bump with its tier"  '^| m | manual | 3.0_1 | 3.1 |$' "$T/body.md"
+assert_eq   "review-tier packages are left out (they get a PR)" "$(grep -c '| r |' "$T/body.md" || true)" "0"
 assert_eq   "auto-updated packages are left out" "$(grep -c '| a |' "$T/body.md" || true)" "0"
 assert_eq   "current and failed packages are left out" "$(grep -cE '\| (b|x) \|' "$T/body.md" || true)" "0"
 

@@ -1,7 +1,8 @@
 name: auto-update
 
-# Detect new stable upstream releases for the templates in tools/auto-update.allow, bump, build and
-# test them, merge one PR per passing bump and publish. Runs on a schedule or by hand; never on
+# Detect new stable upstream releases for the templates in tools/update-tiers (tiers auto and review),
+# bump, build and test them, open one PR per passing bump (tier auto: merged and published; tier review:
+# left for you to merge, the next run then publishes it). Runs on a schedule or by hand; never on
 # pull_request or any fork-driven trigger.
 #
 # Two jobs on purpose. `build` runs third-party build scripts, so it is read-only: no secrets, a
@@ -15,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       pkg:
-        description: "Only this package (overlay template name); ignores the allowlist"
+        description: "Only this package (overlay template name); ignores the tiers (an unlisted or manual package is handled like tier auto)"
         required: false
         type: string
 
