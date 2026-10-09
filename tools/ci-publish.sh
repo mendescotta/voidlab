@@ -296,6 +296,7 @@ if [ ${#accepted[@]} -eq 0 ]; then
 	log "nothing to publish"
 	exit 0
 fi
+mapfile -t accepted < <(printf '%s\n' "${accepted[@]}" | sort -V) # oldest version last-wins order, see voidlab rindex_add
 XBPS_ARCH=x86_64 xbps-rindex -f -a "${accepted[@]}" >/dev/null || die "cannot index the new packages"
 XBPS_ARCH=x86_64 xbps-rindex -r repo >/dev/null
 

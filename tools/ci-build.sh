@@ -42,7 +42,7 @@ seed_binpkgs() {
 	done
 	set -- hostdir/binpkgs/*.xbps
 	shopt -u nullglob
-	[ $# -eq 0 ] || XBPS_ARCH=x86_64 xbps-rindex -f -a "$@" >/dev/null
+	[ $# -eq 0 ] || { mapfile -t sorted < <(printf '%s\n' "$@" | sort -V); XBPS_ARCH=x86_64 xbps-rindex -f -a "${sorted[@]}" >/dev/null; }
 }
 
 repo_list() { (shopt -s nullglob; for f in repo/*.xbps; do echo "${f##*/}"; done | sort); }

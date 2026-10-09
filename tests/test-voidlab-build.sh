@@ -44,6 +44,16 @@ rm -f "$R/repo/good-1.0_1.x86_64.xbps"
 assert_file "new build copied" "$R/repo/good2-1.0_1.x86_64.xbps"
 assert_no  "old build not re-copied" "$R/repo/good-1.0_1.x86_64.xbps"
 
+# xbps-rindex -f keeps the LAST file of a package, so files must be passed oldest version first
+# (a glob sorts _10 before _9, which indexed the older revision and then deleted the newer one)
+touch "$R/repo/ord-1.0_9.x86_64.xbps" "$R/repo/ord-1.0_10.x86_64.xbps" "$R/repo/ord-1.0_2.x86_64.xbps"
+: > "$RINDEX_LOG"
+"$R/voidlab" build good2 >/dev/null 2>&1
+line=$(grep -e '-f -a' "$RINDEX_LOG" | head -n1)
+order=$(grep -o 'ord-1.0_[0-9]*' <<<"$line" | tr '\n' ' ')
+assert_eq "files are indexed oldest revision first" "$order" "ord-1.0_2 ord-1.0_9 ord-1.0_10 "
+rm -f "$R"/repo/ord-*
+
 "$R/voidlab" overlay
 "$R/voidlab" status >/dev/null
 assert_grep "status leaves the overlay in place" 'version=2.0' "$R/.upstream/srcpkgs/good/template"
