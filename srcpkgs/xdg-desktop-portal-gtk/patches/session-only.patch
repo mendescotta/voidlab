@@ -1,3 +1,7 @@
+# Why: Adds a -Dsession-only build option that builds only the GTK-free Inhibit and Email portals (gtk-session), used by the template's second build.
+# Upstream: none
+# Drop when: upstream provides a session-only build option
+
 diff -ruN a/data/gtk-session.portal.in b/data/gtk-session.portal.in
 --- a/data/gtk-session.portal.in	1970-01-01 03:00:00.000000000 +0300
 +++ b/data/gtk-session.portal.in	2026-10-08 14:10:19.543636980 +0300

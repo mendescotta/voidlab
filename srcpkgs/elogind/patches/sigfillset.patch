@@ -1,3 +1,7 @@
+# Why: src/shared/async.h uses sigfillset() without including <signal.h>, so it only compiles where another header happens to pull that in.
+# Upstream: none
+# Drop when: upstream async.h includes <signal.h> itself
+
 diff --git a/src/shared/async.h b/src/shared/async.h
 index cf80acf..d22e77d 100644
 --- a/src/shared/async.h

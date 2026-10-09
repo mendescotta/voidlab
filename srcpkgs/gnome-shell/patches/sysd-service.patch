@@ -1,3 +1,7 @@
+# Why: With -Dsystemd=false (runit) meson skipped the systemd user unit; this makes systemduserunitdir a -D option and installs the unit regardless of systemd.
+# Upstream: none
+# Drop when: never (distro-specific)
+
 diff --git a/data/meson.build b/data/meson.build
 index e37f97bdf..5880b7a46 100644
 --- a/data/meson.build

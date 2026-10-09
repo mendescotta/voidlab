@@ -1,3 +1,7 @@
+# Why: The source tree lacks the v2 default theme schema files (CosmicTheme Dark/Light list_button, Dark.Builder palette) that cosmic-settings expects, so they are supplied here.
+# Upstream: none
+# Drop when: upstream ships these default_schema files
+
 diff -Naur a/resources/default_schema/com.system76.CosmicTheme.Dark/v2/list_button b/resources/default_schema/com.system76.CosmicTheme.Dark/v2/list_button
 --- a/resources/default_schema/com.system76.CosmicTheme.Dark/v2/list_button	1970-01-01 03:00:00.000000000 +0300
 +++ b/resources/default_schema/com.system76.CosmicTheme.Dark/v2/list_button	2026-07-19 14:04:30.216805052 +0300

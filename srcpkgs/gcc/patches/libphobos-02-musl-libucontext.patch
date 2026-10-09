@@ -1,3 +1,7 @@
+# Why: musl has no swapcontext() in libc, so libphobos must link libucontext; this passes LIBUCONTEXT to the libphobos configure and selects external fiber asm on musl targets.
+# Upstream: none
+# Drop when: upstream libphobos builds on musl without the libucontext fallback
+
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -54484,6 +54484,6 @@ configure-target-libphobos:

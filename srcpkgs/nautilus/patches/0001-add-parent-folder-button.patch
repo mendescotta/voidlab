@@ -1,3 +1,7 @@
+# Why: Adds an Open Parent Folder button to the history controls, a local UI addition since the header otherwise offers no way to go up a folder.
+# Upstream: none
+# Drop when: upstream nautilus ships an up button in the history controls
+
 diff --git a/src/resources/ui/nautilus-history-controls.blp b/src/resources/ui/nautilus-history-controls.blp
 index f865151..d56187e 100644
 --- a/src/resources/ui/nautilus-history-controls.blp

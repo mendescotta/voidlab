@@ -1,3 +1,7 @@
+# Why: The source tree lacks the Shortcuts and WindowRules v1 default schema files, so empty defaults ({} and []) are added here.
+# Upstream: none
+# Drop when: upstream ships these default_schema files
+
 diff -Naur a/resources/default_schema/com.system76.CosmicSettings.Shortcuts/v1/defaults b/resources/default_schema/com.system76.CosmicSettings.Shortcuts/v1/defaults
 --- a/resources/default_schema/com.system76.CosmicSettings.Shortcuts/v1/defaults	1970-01-01 03:00:00.000000000 +0300
 +++ b/resources/default_schema/com.system76.CosmicSettings.Shortcuts/v1/defaults	2026-07-20 13:06:01.992767894 +0300

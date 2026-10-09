@@ -1,3 +1,7 @@
+# Why: Lets the GNAT Ada runtime build on musl-based Linux: _GNU_SOURCE before sched.h for CPU-set APIs, generic s-tsmona and ARM runtime file selection for musl, and posix_openpt() instead of getpt() for pty allocation.
+# Upstream: none
+# Drop when: upstream GCC Ada runtime builds on musl without this patch
+
 --- a/gcc/ada/adaint.c
 +++ b/gcc/ada/adaint.c
 @@ -94,6 +94,11 @@

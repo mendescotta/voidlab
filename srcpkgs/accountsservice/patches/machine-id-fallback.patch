@@ -1,3 +1,7 @@
+# Why: Void may lack /etc/machine-id, so fall back to /var/lib/dbus/machine-id instead of aborting at startup.
+# Upstream: none
+# Drop when: never (distro-specific)
+
 --- a/src/util.c	2026-10-04 13:13:49.182587160 +0300
 +++ b/src/util.c	2026-10-04 13:13:49.202292551 +0300
 @@ -459,7 +459,8 @@
