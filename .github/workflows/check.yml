@@ -33,7 +33,9 @@ jobs:
           persist-credentials: false
 
       - name: Prepare container
-        run: sh tools/ci-prepare.sh
+        run: |
+          sh tools/ci-prepare.sh
+          xbps-install -y python3
 
       - name: Check
         env:

@@ -68,7 +68,7 @@ good_a() { # a valid bump of a to 1.1 with a subpackage and an unpublished c
 
 # 0. guard and inputs
 fresh; good_a
-out=$(cd "$T/work" && BUILD_OUT=$T/out bash tools/ci-publish.sh 2>&1 || true)
+out=$(cd "$T/work" && BUILD_OUT=$T/out env -u GITHUB_ACTIONS bash tools/ci-publish.sh 2>&1 || true)
 assert_grep "refuses to run outside GitHub Actions" 'refusing to run outside GitHub Actions' <(echo "$out")
 out=$(cd "$T/work" && CI_AUTO_UPDATE_FORCE=1 bash tools/ci-publish.sh 2>&1 || true)
 assert_grep "needs the build artifact"          'BUILD_OUT' <(echo "$out")
