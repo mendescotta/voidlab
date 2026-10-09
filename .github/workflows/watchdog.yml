@@ -1,0 +1,33 @@
+name: watchdog
+
+# Daily: a scheduled workflow that silently stops looks the same as "no updates". Opens one issue when
+# auto-update has no successful scheduled run in 36 h or overlay-report none in 9 days, and closes it
+# when both are healthy again. Read-only apart from that issue; references no secret.
+on:
+  schedule:
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check scheduled runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash tools/ci-watchdog.sh
