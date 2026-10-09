@@ -1,0 +1,21 @@
+# Known xlint findings that tools/ci-check.sh tolerates, as `path: message` (line numbers dropped).
+# Every entry needs a reason. Fix the template instead of adding a line here; delete lines when fixed.
+
+# false positive: inside a quoted heredoc that is written to the shipped shutdown-hook, not template syntax
+srcpkgs/dinit-void/template: custom variables should use _ prefix: live_src="$(findmnt -n -o SOURCE /run/initramfs/live 2>/dev/null)"
+srcpkgs/dinit-void/template: please indent with tabs
+
+# false positive: qmake_default_version is a real xbps-src variable; upstream has the same line
+srcpkgs/gst-plugins-good1/template: custom variables should use _ prefix: qmake_default_version=none
+srcpkgs/gst-plugins-good1/template: Place qmake_default_version= after checksum=
+
+# TODO: drop wrksrc after an xbps-src extract test (archive top-level dir names already match)
+srcpkgs/caerus/template: wrksrc is deprecated and should not be used
+srcpkgs/dynamod/template: wrksrc is deprecated and should not be used
+srcpkgs/gruvbox-bibata-cursor-theme/template: wrksrc is deprecated and should not be used
+srcpkgs/gruvbox-material-theme/template: wrksrc is deprecated and should not be used
+
+# TODO: check whether vlicense is really needed for these common licenses
+srcpkgs/caerus/template: license GPL-3.0-or-later should not be installed
+srcpkgs/gcc/template: license GFDL-1.2-or-later GPL-3.0-or-later LGPL-2.1-or-later should not be installed
+srcpkgs/libgccjit/template: license GFDL-1.2-or-later GPL-3.0-or-later LGPL-2.1-or-later should not be installed

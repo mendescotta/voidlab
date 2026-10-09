@@ -1,0 +1,43 @@
+name: check
+
+# Pull-request gate: lints the templates and patches a PR touches and runs the test suite
+# (tools/ci-check.sh). Deliberately separate from auto-update.yml, which holds the signing key:
+# this workflow has a read-only token, references no secret, never builds or publishes, and is the
+# only workflow allowed to use the pull_request trigger (tests/test-workflows.sh enforces that).
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:latest
+    steps:
+      - name: Install git
+        run: |
+          mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
+          sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
+          xbps-install -Syu xbps && xbps-install -y git
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare container
+        run: sh tools/ci-prepare.sh
+
+      - name: Check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          sudo -Eu builder env HOME=/home/builder BASE="origin/${BASE_REF:-main}" bash tools/ci-check.sh
