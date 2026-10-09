@@ -1,13 +1,13 @@
 # Template file for 'cosmic-files'
 pkgname=cosmic-files
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace --no-default-features --features bzip2,dbus-config,desktop,gvfs,io-uring,lzma-rust2,notify,wayland,desktop-applet,jemalloc"
 hostmakedepends="pkg-config just $(vopt_if sccache "rust-sccache")"
 makedepends="libxkbcommon-devel libglib-devel"
-depends="bzip2 cosmic-icons glib gvfs liblzma libzstd libxkbcommon libmount libffi libpcre2 libblkid zlib xdg-utils"
+depends="cosmic-icons gvfs xdg-utils"
 short_desc="COSMIC file manager"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"

@@ -1,13 +1,15 @@
 # Template file for 'cosmic-settings'
 pkgname=cosmic-settings
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace"
 hostmakedepends="pkg-config just"
 makedepends="libxkbcommon-devel eudev-libudev-devel libinput-devel mold pipewire-devel clang22-devel libdav1d-devel"
-depends="accountsservice cosmic-icons cosmic-randr cosmic-settings-daemon dbus-libs eudev-libudev fontconfig gettext xkeyboard-config lame libinput libpulseaudio libxkbcommon libpipewire libsndfile libxcb libasyncns libflac libvorbis libogg libmpg123 libXau libXdmcp opus iso-codes NetworkManager power-profiles-daemon wayland"
+depends="accountsservice cosmic-icons cosmic-randr cosmic-settings-daemon
+ fontconfig gettext xkeyboard-config iso-codes NetworkManager
+ power-profiles-daemon wayland"
 short_desc="Settings App for COSMIC"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only AND MPL-2.0"

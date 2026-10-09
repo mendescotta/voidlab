@@ -1,13 +1,13 @@
 # Template file for 'cosmic-workspaces-epoch'
 pkgname=cosmic-workspaces-epoch
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=gnu-makefile
 build_helper="rust"
 hostmakedepends="pkg-config cargo"
 makedepends="libxkbcommon-devel libgbm-devel eudev-libudev-devel libinput-devel"
-depends="cosmic-icons expat libinput libxkbcommon libgbm libdrm wayland"
+depends="cosmic-icons wayland"
 short_desc="COSMIC workspaces"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"

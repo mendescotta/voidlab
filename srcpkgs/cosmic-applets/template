@@ -1,13 +1,13 @@
 # Template file for 'cosmic-applets'
 pkgname=cosmic-applets
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace"
 hostmakedepends="pkg-config just $(vopt_if sccache "rust-sccache")"
 makedepends="libxkbcommon-devel eudev-libudev-devel dbus-devel pulseaudio-devel libinput-devel pipewire-devel clang22-devel"
-depends="cosmic-icons dbus-libs eudev-libudev lame libinput libpipewire libpulseaudio libxkbcommon libsndfile libxcb libasyncns libflac libvorbis libogg libmpg123 libXau libXdmcp opus"
+depends="cosmic-icons"
 short_desc="Applets for COSMIC"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"

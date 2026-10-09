@@ -86,6 +86,21 @@ branch bash -c 'mkdir -p srcpkgs/good/patches; printf "From: A <a@b>\nSubject: [
 out=$(run) && rc=0 || rc=$?
 assert_eq "git-format patch with a Subject passes" "$rc" "0"
 
+# 7b. a -devel package in runtime depends fails; in makedepends or a -devel subpackage it does not
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "depends=\"foo-devel bar\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "-devel in depends fails" "$rc" "1"
+assert_grep "says why" 'makedepends' <(echo "$out")
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; echo "makedepends=\"foo-devel\"" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "-devel in makedepends passes" "$rc" "0"
+new_repo
+branch bash -c 'tmpl good 1.1 1 > srcpkgs/good/template; printf "good-devel_package() {\n\tdepends=\"\${sourcepkg}>=\${version} foo-devel\"\n}\n" >> srcpkgs/good/template'
+out=$(run) && rc=0 || rc=$?
+assert_eq   "-devel in a -devel subpackage passes" "$rc" "0"
+
 # 8. shell syntax errors in tools/ fail
 new_repo
 branch bash -c 'echo "if then" > tools/bad.sh'

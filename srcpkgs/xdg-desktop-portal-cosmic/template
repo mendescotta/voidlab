@@ -1,13 +1,13 @@
 # Template file for 'xdg-desktop-portal-cosmic'
 pkgname=xdg-desktop-portal-cosmic
 version=1.10.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--no-default-features"
 hostmakedepends="pkg-config just"
 makedepends="libxkbcommon-devel libzstd-devel pipewire-devel clang libglib-devel libgbm-devel gstreamer1-devel"
-depends="cosmic-icons libgbm libpipewire glib libxkbcommon libdrm expat zlib libmount libffi libpcre2 libblkid wayland xdg-desktop-portal"
+depends="cosmic-icons wayland xdg-desktop-portal"
 short_desc="Cosmic backend for xdg-desktop-portal"
 maintainer="Bella109 <belladev109@proton.me>"
 license="GPL-3.0-only"

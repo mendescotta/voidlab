@@ -1,13 +1,13 @@
 # Template file for 'pop-launcher'
 pkgname=pop-launcher
 version=1.9.0
-revision=1
+revision=2
 archs="x86_64*"
 build_style=cargo
 configure_args="--workspace"
 hostmakedepends="pkg-config just"
 makedepends="libxkbcommon-devel"
-depends="cosmic-icons dbus fd libqalculate libxkbcommon xdg-utils"
+depends="cosmic-icons dbus fd libqalculate xdg-utils"
 short_desc="Modular IPC-based desktop launcher service"
 maintainer="Bella109 <belladev109@proton.me>"
 license="MPL-2.0 AND GPL-3.0-only"
