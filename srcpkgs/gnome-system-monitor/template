@@ -12,6 +12,6 @@ maintainer="Enno Boland <gottox@voidlinux.org>"
 license="GPL-2.0-or-later"
 homepage="https://wiki.gnome.org/Apps/SystemMonitor"
 #changelog="https://gitlab.gnome.org/GNOME/gnome-system-monitor/-/raw/master/NEWS"
-changelog="https://gitlab.gnome.org/GNOME/gnome-system-monitor/-/raw/51.0/NEWS"
+changelog="https://gitlab.gnome.org/GNOME/gnome-system-monitor/-/raw/${version}/NEWS"
 distfiles="${GNOME_SITE}/${pkgname}/${version:0:2}/${pkgname}-${version}.tar.xz"
 checksum=8887b03427230ac0816d4b0c801ce6628ad1fc9139ed3072914e9faa881ba868

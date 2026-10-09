@@ -6,13 +6,13 @@ build_style=meson
 configure_args="-Dtests=false -Dacl=enabled"
 hostmakedepends="pkg-config"
 makedepends="acl-devel libcap-devel"
-# musl declares getdents64 only under _LARGEFILE64_SOURCE
-if [ "$XBPS_TARGET_LIBC" = musl ]; then
-	CFLAGS+=" -D_LARGEFILE64_SOURCE"
-fi
 short_desc="Standalone systemd-tmpfiles and systemd-sysusers (Chimera)"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="LGPL-2.1-or-later"
 homepage="https://github.com/chimera-linux/sd-tools"
 distfiles="https://github.com/chimera-linux/sd-tools/archive/refs/tags/v${version}.tar.gz"
 checksum=09ffbc8bfe1f660d4918fd50dff51db1686ac9b3bd45c7ddcbf27b0470394da3
+# musl declares getdents64 only under _LARGEFILE64_SOURCE
+if [ "$XBPS_TARGET_LIBC" = musl ]; then
+	CFLAGS+=" -D_LARGEFILE64_SOURCE"
+fi

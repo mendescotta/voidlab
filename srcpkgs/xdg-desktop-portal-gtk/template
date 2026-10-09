@@ -8,7 +8,6 @@ makedepends="flatpak-devel gtk+3-devel libglib-devel
  xdg-desktop-portal gsettings-desktop-schemas-devel fontconfig-devel
  gnome-desktop-devel"
 depends="xdg-desktop-portal gsettings-desktop-schemas"
-conflicts="xdg-desktop-portal-gtk-session>=0"
 short_desc="Portal backend service for Flatpak using GTK+"
 maintainer="Duncaen <duncaen@voidlinux.org>"
 license="LGPL-2.1-or-later"
@@ -16,6 +15,7 @@ homepage="https://github.com/flatpak/xdg-desktop-portal-gtk"
 changelog="https://raw.githubusercontent.com/flatpak/xdg-desktop-portal-gtk/refs/heads/main/NEWS"
 distfiles="https://github.com/flatpak/xdg-desktop-portal-gtk/releases/download/${version}/xdg-desktop-portal-gtk-${version}.tar.xz"
 checksum=47a3743d2419a8601e691db37e85bb5fac5ae4b26842177065cd5f22ada23b37
+conflicts="xdg-desktop-portal-gtk-session>=0"
 
 # Second build with -Dsession-only (patches/session-only.patch): only the
 # Inhibit and Email portals, which need no GTK, linked against glib/gio.

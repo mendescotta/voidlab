@@ -21,7 +21,7 @@ makedepends="eudev-libudev-devel libseat-devel libxkbcommon-devel libinput-devel
 depends="dbus elogind polkit pipewire wireplumber xorg-server-xwayland font-inter
  noto-fonts-ttf gst-plugins-base1 gst-plugins-good1 vulkan-loader"
 short_desc="Visually-focused Wayland desktop with smooth animations and gestures"
-maintainer="gui <mendescotta@gmail.com>"
+maintainer="mendescotta <mendescotta@gmail.com>"
 license="MIT, GPL-3.0-or-later"
 homepage="https://github.com/nongio/otto"
 distfiles="https://github.com/nongio/otto/archive/${_commit}.tar.gz
