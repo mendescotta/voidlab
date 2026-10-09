@@ -1,16 +1,21 @@
 # Template file for 'base-system-dinit'
 pkgname=base-system-dinit
 version=0.1
-revision=4
+revision=5
 metapackage=yes
-# Void's base-system with dinit + dinit-void instead of runit-void. Keep in sync with base-system.
+# Void's base-system with dinit-void instead of runit-void. Keep in sync with base-system, except:
+#  - nano instead of nvi (dinit-void ships /etc/profile.d/editor.sh setting EDITOR=nano)
+#  - no wifi-firmware: it only pulls ipw2100/ipw2200/zd1211 firmware (2005-era chips); current
+#    hardware firmware comes with the kernel packages and voidhw
+#  - no dinit/sd-tools: dinit-void-core already depends on them
+#  - no libgcc: listing it makes the overlay's gcc rebuild; packages that need libgcc_s get it from their shlibs
 depends="base-files>=0.77 ncurses coreutils findutils diffutils
  dash bash grep gzip file sed gawk less util-linux which tar man-pages
  mdocml>=1.13.3 shadow e2fsprogs btrfs-progs xfsprogs f2fs-tools dosfstools
  procps-ng tzdata pciutils usbutils iana-etc openssh dhcpcd kbd iproute2
- iputils iw wpa_supplicant xbps nvi sudo wifi-firmware void-artwork
+ iputils iw wpa_supplicant xbps nano sudo void-artwork
  traceroute ethtool kmod acpid eudev removed-packages linux
- dinit dinit-void sd-tools"
+ dinit-void"
 case "$XBPS_TARGET_MACHINE" in
 	*-musl) depends+=" musl" ;;
 	*) depends+=" glibc-locales" ;;
