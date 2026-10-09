@@ -6,7 +6,7 @@ build_style=meson
 configure_args="-Dtests=false -Dacl=enabled"
 hostmakedepends="pkg-config"
 makedepends="acl-devel libcap-devel"
-short_desc="Standalone systemd-tmpfiles and systemd-sysusers (Chimera)"
+short_desc="Standalone systemd-tmpfiles and systemd-sysusers"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="LGPL-2.1-or-later"
 homepage="https://github.com/chimera-linux/sd-tools"

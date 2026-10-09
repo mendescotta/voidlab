@@ -1,12 +1,10 @@
 # Template file for 'base-system-dinit'
 pkgname=base-system-dinit
 version=0.1
-revision=3
+revision=4
 metapackage=yes
-# Void's base-system with dinit + dinit-void instead of runit-void, and
-# chimerautils' coreutils set first in PATH for login shells (GNU coreutils
-# stays the system userland; dracut needs GNU stat). Keep in sync with base-system.
-depends="base-files>=0.77 ncurses coreutils chimerautils findutils diffutils
+# Void's base-system with dinit + dinit-void instead of runit-void. Keep in sync with base-system.
+depends="base-files>=0.77 ncurses coreutils findutils diffutils
  dash bash grep gzip file sed gawk less util-linux which tar man-pages
  mdocml>=1.13.3 shadow e2fsprogs btrfs-progs xfsprogs f2fs-tools dosfstools
  procps-ng tzdata pciutils usbutils iana-etc openssh dhcpcd kbd iproute2
@@ -17,7 +15,7 @@ case "$XBPS_TARGET_MACHINE" in
 	*-musl) depends+=" musl" ;;
 	*) depends+=" glibc-locales" ;;
 esac
-short_desc="Void Linux base system meta package (dinit-void, chimerautils)"
+short_desc="Void Linux base system meta package (dinit)"
 maintainer="mendescotta <mendescotta@gmail.com>"
 license="Public Domain"
 homepage="https://github.com/mendescotta"
