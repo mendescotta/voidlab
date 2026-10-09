@@ -54,7 +54,7 @@ fi
 # subpackage, a compiler that ships them (gcc*) or a meta package may do that
 for t in "${templates[@]}"; do
 	[ -f "$t" ] || continue
-	case $t in srcpkgs/gcc/* | srcpkgs/gcc-*/* | srcpkgs/libgccjit/*) continue ;; esac
+	case $t in srcpkgs/gcc/* | srcpkgs/gcc-*/*) continue ;; esac
 	if awk '
 		/^[A-Za-z0-9._+-]+_package\(\)/ { sub_ = ($1 ~ /^[A-Za-z0-9._+-]*-devel_package/) }
 		/^}/ { sub_ = 0 }

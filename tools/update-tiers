@@ -22,7 +22,6 @@ voidhw review
 runit-settingsd review
 dinit-settingsd review
 otto review
-dynamod review
 # --- review: applications, themes and fonts (no ABI impact)
 eog review
 evince review
@@ -65,7 +64,6 @@ pop-fonts review
 # --- manual: toolchain, init and boot
 gcc manual
 gcc-multilib manual
-libgccjit manual
 elogind manual
 eudev manual
 pam manual
@@ -119,11 +117,7 @@ gnome-control-center manual
 gnome-shell manual
 mutter manual
 gdm manual
-# --- manual: held sets and desktops bumped as a whole
-budgie-control-center manual
-budgie-desktop manual
-budgie-screensaver manual
-budgie-session manual
+# --- manual: desktops bumped as a whole
 cinnamon manual
 cinnamon-session manual
 cinnamon-settings-daemon manual
