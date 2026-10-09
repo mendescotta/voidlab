@@ -4,7 +4,7 @@
 # is untrusted DATA, validated strictly before anything is pushed, merged or signed. Any deviation
 # aborts the whole run:
 #   - only these files, no symlinks: passed.tsv failed.tsv templates/<n>/template xbps/<n>.xbps logs/<n>.log
-#   - passed.tsv: `bump|unpublished<TAB>pkg<TAB>version_revision`, pkg on the allowlist (or INPUT_PKG)
+#   - passed.tsv: `bump|unpublished<TAB>pkg<TAB>version_revision`, pkg in the auto or review tier (or INPUT_PKG)
 #   - a bumped template may differ from main only in its version, revision and checksum lines
 #   - a package file must be the passed package or one of its declared subpackages, at the passed version
 # Then: one PR per bump (merged), failures become issues, the packages are added to the pulled release
@@ -49,7 +49,12 @@ done < <(find "$BUILD_OUT" -type f)
 [ -f "$BUILD_OUT/passed.tsv" ] && [ -f "$BUILD_OUT/failed.tsv" ] || die "passed.tsv or failed.tsv is missing"
 
 # --- passed.tsv
-allow=$(sed -e 's/#.*//' -e 's/[[:space:]]*$//' tools/auto-update.allow 2>/dev/null | awk 'NF')
+# tiers come from the trusted checkout, never from the artifact. auto: merge and publish; review: open the
+# PR and leave it for the owner (the merged version is then built and published as `unpublished`).
+tiers=$(sed -e 's/#.*//' tools/update-tiers 2>/dev/null | awk 'NF')
+badtier=$(awk 'NF != 2 || $2 !~ /^(auto|review|manual)$/' <<<"$tiers")
+[ -z "$badtier" ] || die "bad line in tools/update-tiers: $badtier"
+tier_of() { awk -v p="$1" '$1 == p { print $2 }' <<<"$tiers"; }
 declare -A STATUS VERREV ALLOWED
 # fields are split by hand: `read` with a tab IFS collapses empty fields, so a line could be accepted
 # that no other parser would read the same way
@@ -65,7 +70,10 @@ while IFS= read -r line; do
 	[[ $verrev =~ $VERREV_RE ]] || die "invalid version in passed.tsv: $pkg"
 	[ -z "${STATUS[$pkg]:-}" ] || die "duplicate entry in passed.tsv: $pkg"
 	[ -f "srcpkgs/$pkg/template" ] && [ ! -L "srcpkgs/$pkg" ] || die "no template for $pkg in the repository"
-	if ! grep -qxF "$pkg" <<<"$allow" && [ "$pkg" != "${INPUT_PKG:-}" ]; then die "$pkg is not on the allowlist"; fi
+	case $(tier_of "$pkg") in
+	auto | review) ;;
+	*) [ "$pkg" = "${INPUT_PKG:-}" ] || die "$pkg is not in the auto or review tier" ;;
+	esac
 	if [ "$status" = unpublished ]; then
 		# nothing is bumped, so the build must be of the template that is on main: no other version
 		mver=$(sed -n 's/^version=//p' "srcpkgs/$pkg/template" | head -n1 | tr -d "\"'")
@@ -235,6 +243,15 @@ for pkg in "${!STATUS[@]}"; do
 	if ! { git switch -q -c "$branch" && git add "srcpkgs/$pkg/template" && git commit -q -m "$pkg $ver" &&
 		git push -q origin "$branch"; } </dev/null; then
 		log "could not push $branch"
+		SKIP[$pkg]=1
+		continue
+	fi
+	if [ "$(tier_of "$pkg")" = review ]; then
+		# built and tested, but a human merges it; the next run publishes the merged version
+		gh pr create --base "$BASE" --head "$branch" --title "$pkg $ver" \
+			--body "Bump $pkg to $ver. Built and tested by the auto-update workflow. Tier review: merge to publish; the next daily run builds and publishes the merged version." </dev/null >/dev/null ||
+			log "could not open the PR for $pkg"
+		log "$pkg is tier review: PR left open"
 		SKIP[$pkg]=1
 		continue
 	fi

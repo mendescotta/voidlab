@@ -22,7 +22,7 @@ fresh() {
 	mkdir -p "$T/work/tools"; cd "$T/work"; git init -q
 	cp "$HERE/../tools/ci-publish.sh" tools/ 2>/dev/null || true
 	for p in a b c z; do mkdir -p srcpkgs/$p; tmpl_p $p 1.0 $H1 > srcpkgs/$p/template; done
-	printf '# allow\na\nc\n' > tools/auto-update.allow
+	printf '# tiers\na auto\nc auto\nr review\n' > tools/update-tiers
 	git add -A; git commit -qm init; git remote add origin "$T/origin.git"; git push -q origin main
 	: > "$T/calls.log"; : > "$T/gh.log"; rm -f "$T/key.pem" "$T/body.md"
 	mkdir -p "$T/out/xbps" "$T/out/templates" "$T/out/logs"; : > "$T/out/passed.tsv"; : > "$T/out/failed.tsv"
@@ -119,7 +119,7 @@ aborted "path traversal in passed.tsv" "invalid package name"
 fresh; good_a; printf 'bump\ta\t$(id)_1\n' > "$T/out/passed.tsv"
 aborted "shell syntax as a version in passed.tsv" "invalid version"
 fresh; good_a; printf 'bump\tb\t1.1_1\n' > "$T/out/passed.tsv"
-aborted "package that is not on the allowlist" "is not on the allowlist"
+aborted "package that is not in the auto or review tier" "is not in the auto or review tier"
 fresh; good_a; printf 'bump\ta\t1.1_1\nbump\ta\t1.1_1\n' > "$T/out/passed.tsv"
 aborted "duplicate entry" "duplicate entry"
 fresh; good_a; printf 'evil\ta\t1.1_1\n' > "$T/out/passed.tsv"
@@ -204,13 +204,32 @@ fresh; good_a; out=$(env -u VOIDLAB_PRIVKEY CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=m
 assert_grep "missing key is an error"           'no VOIDLAB_PRIVKEY' <(echo "$out")
 assert_eq   "missing key stops before any PR"   "$(grep -c 'pr ' "$T/gh.log" || true)" "0"
 
-# 3. an explicit package (workflow_dispatch) may be off the allowlist
+# 3. an explicit package (workflow_dispatch) may be off the tiers
 fresh; good_a; mv "$T/out/templates/a" "$T/out/templates/z"; rm "$T/out/xbps"/*
 tmpl_p z 1.1 $H2 > "$T/out/templates/z/template"
 printf 'bump\tz\t1.1_1\n' > "$T/out/passed.tsv"; addpkg z-1.1_1; addpkg z-devel-1.1_1
 out=$(cd "$T/work" && CI_AUTO_UPDATE_FORCE=1 BASE_BRANCH=main BUILD_OUT=$T/out INPUT_PKG=z bash tools/ci-publish.sh 2>&1) && rc=0 || rc=$?
-assert_eq   "INPUT_PKG allows a non-allowlisted package" "$rc" "0"
+assert_eq   "INPUT_PKG allows an unlisted package" "$rc" "0"
 assert_grep "z is bumped"                       'pr create --base main --head autobump/z-1.1' "$T/gh.log"
+
+# 3b. tier review: PR opened and left open, nothing of it published; an auto package in the same run is
+fresh; good_a
+mkdir -p "$T/work/srcpkgs/r" "$T/out/templates/r"; tmpl_p r 1.0 $H1 > "$T/work/srcpkgs/r/template"
+(cd "$T/work" && git add -A && git commit -qm r && git push -q origin main)
+tmpl_p r 1.1 $H2 > "$T/out/templates/r/template"
+printf 'bump\ta\t1.1_1\nbump\tr\t1.1_1\nunpublished\tc\t1.0_1\n' > "$T/out/passed.tsv"
+addpkg r-1.1_1; addpkg r-devel-1.1_1
+out=$(run) && rc=0 || rc=$?
+assert_eq   "tier review run succeeds"          "$rc" "0"
+assert_grep "review: a PR is opened"            'pr create --base main --head autobump/r-1.1' "$T/gh.log"
+assert_eq   "review: the PR is never merged"    "$(grep -c 'pr merge autobump/r-1.1' "$T/gh.log" || true)" "0"
+assert_grep "auto: the other bump is merged"    'pr merge autobump/a-1.1' "$T/gh.log"
+assert_eq   "review: its packages are not published" "$(grep '^publish' "$T/calls.log" | grep -c 'r-1.1_1' || true)" "0"
+assert_grep "auto packages are still published" 'a-1.1_1.noarch.xbps' "$T/calls.log"
+
+# a broken tiers file must stop the run before any push
+fresh; good_a; printf 'a auto\nc reveiw\n' > "$T/work/tools/update-tiers"
+aborted "typo in a tier" "bad line in tools/update-tiers"
 
 # 4. existing remote branch: that package is skipped, its packages are not published
 fresh; good_a; git -C "$T/work" push -q origin HEAD:refs/heads/autobump/a-1.1
