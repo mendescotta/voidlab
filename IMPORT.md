@@ -7,10 +7,6 @@ Seeded from void-packages (base `origin/master`, branches master, gnome-51, gcc1
 | adwaita-fonts | 51.0_1 | gnome-51 | 718f7be0e77 | master=50.0_1, gcc16=50.0_1, pam-1.7.3=50.0_1 |
 | adwaita-icon-theme | 51.0_1 | gnome-51 | 718f7be0e77 | master=50.0_1, gcc16=50.0_1, pam-1.7.3=50.0_1 |
 | atkmm | 2.28.5_1 | gnome-51 | 94230d22f19 |  |
-| budgie-control-center | 1.4.0_2 | gnome-51 | 718f7be0e77 |  |
-| budgie-desktop | 10.9.4_2 | gnome-51 | 718f7be0e77 |  |
-| budgie-screensaver | 5.1.0_3 | gnome-51 | 718f7be0e77 |  |
-| budgie-session | 1.0.1_2 | gnome-51 | 718f7be0e77 |  |
 | caerus | 0.5.0_1 | master | 2aab28b0db8 | gnome-51=0.5.0_1, gcc16=0.5.0_1, pam-1.7.3=0.5.0_1 |
 | cheese | 44.1_5 | gnome-51 | 718f7be0e77 |  |
 | cinnamon | 6.6.9_1 | master | c72a1062b7c |  |
@@ -92,7 +88,6 @@ Seeded from void-packages (base `origin/master`, branches master, gnome-51, gcc1
 | gvfs-goa | (removed) | gnome-51 | ea32e6b3bde |  |
 | hddtemp | 0.3.beta15_3 | master | 69464e62bd8 | gnome-51=0.3.beta15_3, gcc16=0.3.beta15_3, pam-1.7.3=0.3.beta15_3 |
 | libadwaita | 1.9.4_1 | gnome-51 | 240d322021a |  |
-| libgccjit | 16.2.1+20260926_1 | gcc16 | c3175012816 |  |
 | libgsf | 1.14.60_1 | gnome-51 | 0156bf181bd |  |
 | libmanette | 0.2.13_1 | gnome-51 | 1cd1e9f4754 |  |
 | libsecret | 0.21.8.2_1 | gnome-51 | edb51c2f38f |  |
