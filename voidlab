@@ -116,9 +116,19 @@ rindex_add() {
 index_repo() {
 	local marker=$1 f
 	mkdir -p "$REPO"
+	local -A built=()
+	local re='^(.+)-[^-]+_[0-9]+\.([^.]+)\.xbps$' g
 	while IFS= read -r -d '' f; do
 		cp "$f" "$REPO/"
+		[[ ${f##*/} =~ $re ]] && built[${BASH_REMATCH[1]}]=${f##*/}
 	done < <(find "$HOSTDIR/binpkgs" \( -name "*.$ARCH.xbps" -o -name '*.noarch.xbps' \) -newer "$marker" -print0 2>/dev/null)
+	# a build supersedes every other version of that package here, also one that sorts higher: the
+	# template may revert it (reverts=), and rindex_add would otherwise index the higher one
+	for g in "$REPO"/*.xbps; do
+		[[ ${g##*/} =~ $re ]] || continue
+		f=${built[${BASH_REMATCH[1]}]:-}
+		[ -n "$f" ] && [ "$f" != "${g##*/}" ] && rm -f "$g"
+	done
 	shopt -s nullglob
 	set -- "$REPO"/*.xbps
 	shopt -u nullglob

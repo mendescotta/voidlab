@@ -54,6 +54,16 @@ order=$(grep -o 'ord-1.0_[0-9]*' <<<"$line" | tr '\n' ' ')
 assert_eq "files are indexed oldest revision first" "$order" "ord-1.0_2 ord-1.0_9 ord-1.0_10 "
 rm -f "$R"/repo/ord-*
 
+# a build supersedes every other version of that package in repo/, even one that sorts higher
+# (dinit-void 0.1 reverts the pulled 0.99.25_4; indexed oldest first, 0.99.25 would win)
+touch "$R/repo/good2-9.0_1.x86_64.xbps" "$R/repo/good2-devel-9.0_1.x86_64.xbps" "$R/repo/other-9.0_1.x86_64.xbps"
+"$R/voidlab" build good2 >/dev/null 2>&1
+assert_file "the new build is in repo/"               "$R/repo/good2-1.0_1.x86_64.xbps"
+assert_no   "another version of the built package is dropped" "$R/repo/good2-9.0_1.x86_64.xbps"
+assert_file "a package whose name merely starts the same stays" "$R/repo/good2-devel-9.0_1.x86_64.xbps"
+assert_file "unrelated packages stay"                 "$R/repo/other-9.0_1.x86_64.xbps"
+rm -f "$R"/repo/good2-devel-* "$R"/repo/other-*
+
 "$R/voidlab" overlay
 "$R/voidlab" status >/dev/null
 assert_grep "status leaves the overlay in place" 'version=2.0' "$R/.upstream/srcpkgs/good/template"
