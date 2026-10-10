@@ -1,6 +1,0 @@
-# COSMIC greeter daemon
-type = process
-log-type = buffer
-command = /usr/libexec/dinit-dm cosmic-greeter-daemon /usr/bin/cosmic-greeter-daemon
-smooth-recovery = true
-depends-on: dbus

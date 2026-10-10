@@ -1,6 +1,0 @@
-# SPICE agent daemon (clipboard, display resize under QEMU/KVM)
-type = process
-log-type = buffer
-command = /bin/sh -c "mkdir -p /var/run/spice-vdagentd; exec /usr/bin/spice-vdagentd -x"
-smooth-recovery = true
-depends-on: local.target

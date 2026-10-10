@@ -1,9 +1,0 @@
-# COSMIC greeter (greetd)
-type = process
-log-type = buffer
-command = /usr/bin/greetd -c /etc/greetd/cosmic-greeter.toml
-smooth-recovery = true
-depends-on: dbus
-depends-on: elogind
-depends-on: cosmic-greeter-daemon
-depends-on: login.target

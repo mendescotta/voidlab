@@ -1,6 +1,0 @@
-# VirtualBox Guest Additions service
-type = process
-log-type = buffer
-command = /usr/bin/VBoxService -f
-smooth-recovery = true
-depends-on: dbus

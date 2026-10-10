@@ -1,4 +1,0 @@
-#!/bin/sh
-# Generate any missing ssh host keys (no-op when openssh isn't installed).
-[ -x /usr/bin/ssh-keygen ] || exit 0
-exec /usr/bin/ssh-keygen -A

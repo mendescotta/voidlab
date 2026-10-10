@@ -1,7 +1,0 @@
-# Bluetooth daemon
-type = process
-log-type = buffer
-command = /usr/libexec/bluetooth/bluetoothd -n
-smooth-recovery = true
-depends-on: dbus
-depends-on: local.target

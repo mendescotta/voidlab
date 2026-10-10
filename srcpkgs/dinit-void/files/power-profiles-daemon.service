@@ -1,6 +1,0 @@
-# Power profiles daemon
-type = process
-log-type = buffer
-command = /usr/libexec/power-profiles-daemon
-smooth-recovery = true
-depends-on: dbus
