@@ -1,6 +1,6 @@
 # Template file for 'voidhw'
 pkgname=voidhw
-version=0.1.1
+version=0.1.2
 revision=1
 build_style=cargo
 short_desc="Hardware-aware driver and firmware selection for Void Linux"
@@ -8,4 +8,4 @@ maintainer="mendescotta <mendescotta@gmail.com>"
 license="GPL-3.0-or-later"
 homepage="https://github.com/mendescotta/voidhw"
 distfiles="https://github.com/mendescotta/voidhw/archive/refs/tags/v${version}.tar.gz"
-checksum=6bf2799a2be48287b6092e3c700c18f7814e933e2a62c91b195fde25b7aa0f0f
+checksum=d022280a2cdc64da241982486e0be7591afbbaaa47bc2d47da5669feab87e1a9
