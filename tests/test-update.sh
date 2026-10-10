@@ -96,4 +96,13 @@ assert_grep "c: reverting the released version is unpublished" "^unpublished${ta
 printf 'pkgname=c\nversion=0.1\nrevision=1\nchecksum=old\n' > "$R/srcpkgs/c/template"
 out=$("$R/voidlab" update --check c)
 assert_grep "c: older without reverts stays current" "^current${tab}c${tab}0.1_1" <(echo "$out")
+# the default check also finds templates outside the auto/review tiers that the release lacks or has
+# older (manual or unlisted): they are published like any other, but never bumped or update-checked
+printf 'pkgname=c\nversion=1.0\nrevision=1\nchecksum=old\n' > "$R/srcpkgs/c/template"
+out=$("$R/voidlab" update --check)
+assert_grep "m: manual and absent from the release is unpublished" "^unpublished${tab}m${tab}1.0_1${tab}-\$" <(echo "$out")
+assert_grep "n: unlisted and absent from the release is unpublished" "^unpublished${tab}n${tab}1.0_1${tab}-\$" <(echo "$out")
+assert_eq   "n: an untiered template is never offered a bump" "$(grep -c "^bump${tab}n${tab}" <<<"$out" || true)" "0"
+assert_grep "c: tiered and published stays current" "^current${tab}c${tab}1.0_1" <(echo "$out")
+assert_grep "f: tiered templates still get the upstream check" "^bump${tab}f${tab}1.0_1${tab}1.1\$" <(echo "$out")
 finish

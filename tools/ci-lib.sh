@@ -51,30 +51,6 @@ template_verrev() {
 	echo "${v}_${r}"
 }
 
-# dep_words <template>: the package names its depends/makedepends/hostmakedepends mention (text only)
-dep_words() {
-	perl -0ne 'while (/^[ \t]*(?:depends|makedepends|hostmakedepends)[ \t]*\+?=[ \t]*(?:"([^"]*)"|\x27([^\x27]*)\x27)/mg) { my $v = defined $1 ? $1 : $2; print "$_\n" for split /\s+/, $v }' "srcpkgs/$1/template" |
-		sed -E 's/[<>=].*$//' | grep -E '^[A-Za-z0-9][A-Za-z0-9._+-]*$' | sort -u
-}
-
-# deps_closure <template>...: those templates plus every overlay template they need to build or run
-deps_closure() {
-	local -A seen=()
-	local queue=("$@") t w o
-	name_map_load
-	while [ ${#queue[@]} -gt 0 ]; do
-		t=${queue[0]}; queue=("${queue[@]:1}")
-		[ -z "${seen[$t]:-}" ] || continue
-		seen[$t]=1
-		[ -f "srcpkgs/$t/template" ] || continue
-		while IFS= read -r w; do
-			o=${NAME_OWNER[$w]:-}
-			[ -n "$o" ] && [ -z "${seen[$o]:-}" ] && queue+=("$o")
-		done < <(dep_words "$t")
-	done
-	printf '%s\n' "${!seen[@]}"
-}
-
 # declared <template> <key> <version> <revision>: the words a template assigns to `key` (text only, nothing
 # executed), on any line including subpackage functions, with the simple expansions applied; a mention in a
 # comment or a longer word does not count

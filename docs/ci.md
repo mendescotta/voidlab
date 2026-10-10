@@ -16,8 +16,9 @@ PR open: merge it and the next daily run builds and publishes the merged version
 signing key. A failing package opens or updates one `auto-update failed: <pkg>` issue and never blocks
 the others. Tiers decide what is *bumped*: libraries, the toolchain and the session stack are tier
 `manual`, bump those by hand (`./voidlab tiers` lists every template with its tier). *Publishing* is a
-separate rule: any template already on `main` that is newer than the release is published, whatever its
-tier, including dependencies CI had to build along the way (for example `evolution-data-server`, which
+separate rule: any template already on `main` that is newer than the release (or that the release lacks) is
+built and published, whatever its tier: the daily check compares every template with the release, and runs the
+upstream update check only for the auto and review tiers. That includes dependencies CI had to build along the way (for example `evolution-data-server`, which
 `gnome-shell` needs). Only the names in `tools/never-publish` are excluded.
 The build job runs the same package checks (`pkg_meta_problems` in `tools/ci-lib.sh`, which follows
 xbps-src's own provides and shlib-provides hooks) right after each build, so a package the publish job

@@ -62,6 +62,7 @@ repo_list() { (shopt -s nullglob; for f in repo/*.xbps; do echo "${f##*/}"; done
 "$VL" pull </dev/null || exit 1
 name_map_load
 seed_binpkgs || exit 1
+never=$(list_names tools/never-publish)
 plan=$("$VL" update --check ${INPUT_PKG:+"$INPUT_PKG"} </dev/null) || exit 1
 printf '%s\n' "$plan"
 # human-readable record of everything checked, so "nothing to do" is distinguishable from "did not look";
@@ -83,6 +84,10 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 	bump | unpublished) ;;
 	*) continue ;;
 	esac
+	if grep -qxF -- "$pkg" <<<"$never"; then
+		log "$pkg is on the never-publish list: not built"
+		continue
+	fi
 	if [ "$status" = bump ]; then ver=${other}_1; else ver=$ours; fi
 	# a bump whose PR is already open (tier review, or a stuck auto merge) is not rebuilt every night
 	if [ "$status" = bump ] && git ls-remote --exit-code --heads origin "autobump/$pkg-$other" </dev/null >/dev/null 2>&1; then
@@ -135,7 +140,6 @@ while IFS=$'\t' read -r -u 3 status pkg ours other; do
 	# the lab is ahead of the release. A dependency owned by another overlay template is recorded as an
 	# `unpublished` entry of that owner (the publish job validates it like any other); one owned by a
 	# never-publish template is dropped; an unknown name is handed over and rejected there.
-	never=$(list_names tools/never-publish)
 	while IFS= read -r f; do
 		[ -n "$f" ] || continue
 		[[ $f =~ ^(.+)-([0-9][0-9A-Za-z.+~]*_[0-9]+)\.(x86_64|noarch)\.xbps$ ]] || { cp "repo/$f" "$OUT/xbps/"; continue; }
