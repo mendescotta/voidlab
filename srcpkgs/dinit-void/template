@@ -22,7 +22,7 @@ maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause, Apache-2.0, Public Domain"
 homepage="https://github.com/mendescotta/dinit-void"
 distfiles="https://github.com/mendescotta/dinit-void/archive/v${version}.tar.gz"
-checksum=86dad6248a0f2d2ad25d80c6e664cc6075d17d93c98f7d41b5085ad63521df44
+checksum=d4e8ee641023ad7d0773e75006a86b075ac5cfddf39a080cd7883902ec4e7d64
 conflicts="runit-void>=0 dinit-void-core>=0"
 make_dirs="/etc/dinit.d/boot.d 0755 root root"
 
