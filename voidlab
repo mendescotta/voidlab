@@ -472,7 +472,11 @@ cmd_publish() {
 	[ -f "$REPO/x86_64-repodata" ] || die "nothing to publish; run: voidlab build <pkg>"
 	rm -rf "$DIST"
 	mkdir -p "$DIST"
-	cp "$REPO"/*.xbps "$REPO/x86_64-repodata" "$DIST/"
+	for _f in "$REPO"/*.xbps; do
+		case ${_f##*/} in nvidia-*) continue ;; esac
+		cp "$_f" "$DIST/"
+	done
+	cp "$REPO/x86_64-repodata" "$DIST/"
 	xbps-rindex --privkey "$KEY" --signedby "voidlab <${GH_REPO%%/*}>" --sign "$DIST" >/dev/null
 	xbps-rindex --privkey "$KEY" --sign-pkg "$DIST"/*.xbps >/dev/null
 	gh release view "$RELEASE_TAG" -R "$GH_REPO" >/dev/null 2>&1 ||
