@@ -1,12 +1,13 @@
 # Template file for 'xfce-core'
 pkgname=xfce-core
 version=4.20
-revision=1
+revision=2
 metapackage=yes
-# The xfce4 meta minus its optional apps (parole, ristretto, mousepad),
+# The xfce4 meta minus its optional apps (parole, ristretto),
 # thumbnails (tumbler pulls ffmpegthumbnailer and ffmpeg) and xfwm4-themes.
 depends="
  Thunar>=${version}
+ mousepad>=${version}
  exo>=${version}
  thunar-volman>=${version}
  upower
