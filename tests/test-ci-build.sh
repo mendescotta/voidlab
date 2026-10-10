@@ -119,6 +119,13 @@ out=$(cd "$W" && CI_AUTO_UPDATE_FORCE=1 AUTO_UPDATE_OUT=$W/out AUTO_UPDATE_BUDGE
 assert_eq   "no build starts after the budget"   "$(grep -c '^build ' "$T/calls.log" || true)" "0"
 assert_grep "the skip is logged"                 'a is left for the next run' <(echo "$out")
 
+# a never-publish template is never built, even when the release lacks it (the publish job would abort)
+printf 'unpublished\tnv\t1.0_1\t-\nunpublished\tc\t1.0_1\t0.9_1\n' > "$T/plan"; : > "$T/calls.log"
+out=$(run)
+assert_eq   "a never-publish template is not built" "$(grep -c '^build nv$' "$T/calls.log" || true)" "0"
+assert_grep "and the skip is logged"            'nv is on the never-publish list' <(echo "$out")
+assert_grep "the rest is still built"           '^build c$' "$T/calls.log"
+
 # a bump whose autobump branch already exists on origin is not rebuilt
 git init -q --bare "$T/origin.git"; git -C "$W" remote add origin "$T/origin.git"
 git -C "$W" push -q origin HEAD:refs/heads/autobump/a-1.1

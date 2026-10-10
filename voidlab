@@ -307,12 +307,22 @@ cmd_update() {
 		shift
 	done
 	need_upstream
+	# release_only[pkg]: a template outside the auto/review tiers, listed by the default run only to
+	# find what main has that the release lacks: no upstream check, never a bump
+	local -A release_only=()
 	if [ ${#pkgs[@]} -eq 0 ]; then
 		if [ -n "$all" ]; then
 			mapfile -t pkgs < <(overlay_names)
 		else
 			out=$(tier_names auto review) || exit 1
 			[ -z "$out" ] || mapfile -t pkgs <<<"$out"
+			if [ -f "$RELDIR/$ARCH-repodata" ]; then
+				local -A tiered=()
+				for p in "${pkgs[@]}"; do tiered[$p]=1; done
+				while IFS= read -r p; do
+					[ -n "$p" ] && [ -z "${tiered[$p]:-}" ] && { release_only[$p]=1; pkgs+=("$p"); }
+				done < <(overlay_names)
+			fi
 		fi
 	fi
 	cmd_overlay
@@ -320,7 +330,9 @@ cmd_update() {
 		if ! t=$(overlay_tmpl "$p"); then printf 'fail\t%s\t-\tno overlay template\n' "$p"; continue; fi
 		if ! ours=$(tmpl_ver "$t"); then printf 'fail\t%s\t-\tunparseable template\n' "$p"; continue; fi
 		cur=${ours%_*}
-		if ! out=$(cd "$UP" && ./xbps-src update-check "$p" 2>&1); then
+		if [ -n "${release_only[$p]:-}" ]; then
+			out=
+		elif ! out=$(cd "$UP" && ./xbps-src update-check "$p" 2>&1); then
 			printf 'fail\t%s\t%s\tupdate-check failed\n' "$p" "$ours"; continue
 		fi
 		new=$(latest_stable "$p" <<<"$out")
