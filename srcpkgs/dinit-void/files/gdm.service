@@ -1,8 +1,0 @@
-# gdm display manager
-type = process
-log-type = buffer
-command = /usr/libexec/dinit-dm gdm /usr/bin/gdm
-smooth-recovery = true
-depends-on: dbus
-depends-on: elogind
-depends-on: login.target

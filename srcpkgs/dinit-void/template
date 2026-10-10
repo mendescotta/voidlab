@@ -1,107 +1,53 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
-version=0.99.25
-revision=10
-# Chimera's dinit-chimera early-boot suite (meson, upstream tarball) plus the Void glue:
-# device/console helpers, the power commands, and base services (gettys, dhcpcd, sshd,
-# dbus, elogind, polkitd, NetworkManager, wpa_supplicant, acpid, display managers, chronyd).
-# /usr/bin/init is dinit-chimera's env-cleaning wrapper. dbus-wait-for is q66's
-# D-Bus readiness helper (BSD-2-Clause).
-build_style=meson
-configure_args="-Ddefault-path-env=/usr/bin"
+reverts="0.99.25_1 0.99.25_2 0.99.25_3 0.99.25_4 0.99.25_5 0.99.25_6 0.99.25_7 0.99.25_8 0.99.25_9 0.99.25_10"
+version=0.1
+revision=1
+# Void's boot on dinit (mendescotta/dinit-void): void-runit's early boot and shutdown as dinit
+# services, plus the services for Void's daemons. 0.1 replaces the dinit-chimera based 0.99.25
+# builds (hence reverts); nothing from Chimera is used.
+build_style=gnu-makefile
+make_install_target="install install-init"
 hostmakedepends="pkg-config"
-makedepends="libkmod-devel dbus-devel"
+makedepends="dbus-devel"
 # Two flavours of the same files:
-#  - dinit-void: the dinit distro (ISOs, vessel installs). Standalone and dinit only: it owns
-#    /usr/bin/{init,shutdown,halt,poweroff,reboot} like any other dinit distro.
+#  - dinit-void: the dinit distro (ISOs, vessel installs). dinit is PID 1 and it owns
+#    /usr/bin/{init,shutdown,halt,poweroff,reboot,soft-reboot}, like runit-void.
 #  - dinit-void-core: the lab flavour for a runit host. It leaves out those commands and ships the
-#    glue to boot dinit from a second boot entry (see dinit-alongside-init, tools/dinit-alongside).
+#    glue to boot dinit from a second boot entry (dinit-alongside-init, tools/dinit-alongside).
 # They conflict; never install both.
-depends="dinit sd-tools kmod eudev kbd util-linux"
-make_dirs="
- /etc/dinit.d/boot.d 0755 root root
- /usr/lib/dinit.d/boot.d 0755 root root"
-short_desc="Dinit early-boot services with Void Linux integration"
+depends="dinit eudev kmod kbd util-linux iproute2 procps-ng"
+short_desc="Void Linux boot, shutdown and daemon services for dinit"
 maintainer="mendescotta <mendescotta@gmail.com>"
-license="BSD-2-Clause"
-homepage="https://github.com/chimera-linux/dinit-chimera"
-distfiles="https://github.com/chimera-linux/dinit-chimera/archive/v${version}.tar.gz"
-checksum=777dbee5a69f96a1a4cd812c7fa3dce62a7247a4be99420832a778e548c357f7
-# owns /usr/bin/{init,shutdown,halt,poweroff,reboot} like runit-void
+license="BSD-2-Clause, Apache-2.0, Public Domain"
+homepage="https://github.com/mendescotta/dinit-void"
+distfiles="https://github.com/mendescotta/dinit-void/archive/v${version}.tar.gz"
+checksum=d4e8ee641023ad7d0773e75006a86b075ac5cfddf39a080cd7883902ec4e7d64
 conflicts="runit-void>=0 dinit-void-core>=0"
-
-post_build() {
-	${CC} ${CFLAGS} ${LDFLAGS} -o dbus-wait-for ${FILESDIR}/dbus-wait-for.c \
-		$(pkg-config --cflags --libs dbus-1)
-}
+make_dirs="/etc/dinit.d/boot.d 0755 root root"
 
 post_install() {
-	vlicense COPYING.md
-	vlicense ${FILESDIR}/COPYING.dinit-glue COPYING.dinit-glue
-
-	vinstall dbus-wait-for 755 usr/libexec
-	vinstall ${FILESDIR}/dinit-dbus 755 usr/libexec
-	vinstall ${FILESDIR}/dinit-dm 755 usr/libexec
-	vinstall ${FILESDIR}/dinit-devd 755 usr/libexec
-	vinstall ${FILESDIR}/dinit-console 755 usr/libexec
-	vinstall ${FILESDIR}/agetty-default 755 usr/lib/dinit
-	vinstall ${FILESDIR}/ssh-keygen 755 usr/lib/dinit
-	vinstall ${FILESDIR}/editor.sh 644 etc/profile.d
-
-	# Eject the optical live medium at the very end of shutdown, like Debian/Devuan.
-	# `eject -s` skips the kernel's "device busy" check for the mounted ISO; nothing is
-	# read from it after this, and the hook ends here.
-	cat >>${DESTDIR}/usr/lib/dinit/shutdown-hook <<'EOF2'
-
-live_src="$(findmnt -n -o SOURCE /run/initramfs/live 2>/dev/null)"
-case "$live_src" in
-    /dev/sr*|/dev/scd*) eject -s -m "$live_src" >/dev/null 2>&1 ;;
-esac
-EOF2
-
-	vmkdir usr/bin
-	local c
-	for c in shutdown halt poweroff reboot soft-reboot; do
-		ln -s dinit-$c ${DESTDIR}/usr/bin/$c
-	done
-
-	vmkdir etc/dinit.d
-	for c in 1 2 3 4 5 6 S0; do
-		sed "s/@TTY@/tty$c/g" ${FILESDIR}/agetty.in \
-			> ${DESTDIR}/etc/dinit.d/agetty-tty$c
-	done
-	for c in dhcpcd sshd ssh-keygen dbus elogind polkitd NetworkManager \
-		lightdm gdm sddm cosmic-greeter-daemon cosmic-greeter chronyd \
-		vmtoolsd vmware-vmblock-fuse vboxservice spice-vdagentd \
-		power-profiles-daemon switcheroo-control wpa_supplicant acpid bluetoothd rtkit; do
-		vinstall ${FILESDIR}/$c.service 644 etc/dinit.d $c
-	done
+	vlicense COPYING
+	vlicense LICENSES/BSD-2-Clause-OpenRC
+	vlicense LICENSES/BSD-2-Clause-Artix
 }
 
 dinit-void-core_package() {
 	short_desc+=" - lab flavour for a runit host (no init or power commands)"
-	depends="dinit sd-tools kmod eudev kbd util-linux"
+	depends="dinit eudev kmod kbd util-linux iproute2 procps-ng"
 	conflicts="dinit-void>=0"
-	make_dirs="
-	 /etc/dinit.d/boot.d 0755 root root
-	 /usr/lib/dinit.d/boot.d 0755 root root"
+	make_dirs="/etc/dinit.d/boot.d 0755 root root"
 	pkg_install() {
-		local f d
+		local d f
 		# a copy of everything dinit-void ships, minus what runit-void owns
 		for d in etc usr; do
 			vmkdir $d
 			cp -a ${DESTDIR}/$d/. ${PKGDESTDIR}/$d/
 		done
-		for f in shutdown halt poweroff reboot; do
+		for f in init shutdown halt poweroff reboot soft-reboot; do
 			rm -f ${PKGDESTDIR}/usr/bin/$f
 		done
-		rm -f ${PKGDESTDIR}/usr/bin/init ${PKGDESTDIR}/etc/profile.d/editor.sh
-		# init keeps its binary under a name that does not collide with runit-void's /usr/bin/init
-		vmkdir usr/libexec
-		cp -a ${DESTDIR}/usr/bin/init ${PKGDESTDIR}/usr/libexec/dinit-init
-		# booting dinit from a second entry on a runit system
-		vinstall ${FILESDIR}/dinit-alongside-init 755 usr/libexec
-		vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside shutdown
-		vinstall ${FILESDIR}/alongside-cmd 755 usr/lib/dinit/alongside halt
+		rm -f ${PKGDESTDIR}/etc/profile.d/editor.sh
+		make DESTDIR=${PKGDESTDIR} install-alongside
 	}
 }

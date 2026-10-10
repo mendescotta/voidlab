@@ -1,8 +1,0 @@
-# Login and seat management
-type = process
-log-type = buffer
-command = /usr/libexec/elogind/elogind.wrapper
-smooth-recovery = true
-depends-on: dbus
-depends-on: local.target
-before: login.target

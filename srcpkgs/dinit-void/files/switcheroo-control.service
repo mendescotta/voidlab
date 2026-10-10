@@ -1,6 +1,0 @@
-# Hybrid-graphics GPU switching
-type = process
-log-type = buffer
-command = /usr/libexec/switcheroo-control
-smooth-recovery = true
-depends-on: dbus

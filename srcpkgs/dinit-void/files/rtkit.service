@@ -1,7 +1,0 @@
-# Realtime scheduling policy service
-type = process
-log-type = buffer
-command = /usr/libexec/rtkit-daemon
-smooth-recovery = true
-depends-on: dbus
-depends-on: local.target
