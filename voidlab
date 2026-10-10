@@ -332,6 +332,9 @@ cmd_update() {
 		if rel=$(release_ver "$p"); then
 			rc=1
 			[ -z "$rel" ] || { rc=0; xbps-uhelper cmpver "$ours" "$rel" || rc=$?; }
+			# a template whose reverts= lists the published version replaces it, as xbps treats it
+			if [ "$rc" -ne 1 ] && [ -n "$rel" ] &&
+				grep -qxF -- "$rel" <<<"$(sed -n 's/^reverts=//p' "$t" | tr -d "\"'" | tr -s ' \t' '\n')"; then rc=1; fi
 			if [ "$rc" -eq 1 ]; then printf 'unpublished\t%s\t%s\t%s\n' "$p" "$ours" "${rel:--}"; continue; fi
 		fi
 		printf 'current\t%s\t%s\t-\n' "$p" "$ours"

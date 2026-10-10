@@ -89,4 +89,11 @@ out=$("$R/voidlab" update --check b c e)
 assert_grep "b: template newer than release is unpublished" "^unpublished${tab}b${tab}2.0_1${tab}1.0_1\$" <(echo "$out")
 assert_grep "c: same as release is current"      "^current${tab}c${tab}1.0_1" <(echo "$out")
 assert_grep "e: absent from release is unpublished" "^unpublished${tab}e${tab}1.0_1${tab}-\$" <(echo "$out")
+# a lower version that reverts the released one (dinit-void 0.99.25 -> 0.1) is newer, as for xbps
+printf 'pkgname=c\nreverts="0.9_1 1.0_1"\nversion=0.1\nrevision=1\nchecksum=old\n' > "$R/srcpkgs/c/template"
+out=$("$R/voidlab" update --check c)
+assert_grep "c: reverting the released version is unpublished" "^unpublished${tab}c${tab}0.1_1${tab}1.0_1\$" <(echo "$out")
+printf 'pkgname=c\nversion=0.1\nrevision=1\nchecksum=old\n' > "$R/srcpkgs/c/template"
+out=$("$R/voidlab" update --check c)
+assert_grep "c: older without reverts stays current" "^current${tab}c${tab}0.1_1" <(echo "$out")
 finish
