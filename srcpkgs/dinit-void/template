@@ -1,11 +1,11 @@
 # Template file for 'dinit-void'
 pkgname=dinit-void
 reverts="0.99.25_1 0.99.25_2 0.99.25_3 0.99.25_4 0.99.25_5 0.99.25_6 0.99.25_7 0.99.25_8 0.99.25_9 0.99.25_10"
-version=0.1
+version=0.1.1
 revision=1
 # Void's boot on dinit (mendescotta/dinit-void): void-runit's early boot and shutdown as dinit
 # services, plus the services for Void's daemons. 0.1 replaces the dinit-chimera based 0.99.25
-# builds (hence reverts); nothing from Chimera is used.
+# builds (hence reverts, which 0.1.x still needs: it sorts below 0.99.25); nothing from Chimera is used.
 build_style=gnu-makefile
 make_install_target="install install-init"
 hostmakedepends="pkg-config"
@@ -22,7 +22,7 @@ maintainer="mendescotta <mendescotta@gmail.com>"
 license="BSD-2-Clause, Apache-2.0, Public Domain"
 homepage="https://github.com/mendescotta/dinit-void"
 distfiles="https://github.com/mendescotta/dinit-void/archive/v${version}.tar.gz"
-checksum=d4e8ee641023ad7d0773e75006a86b075ac5cfddf39a080cd7883902ec4e7d64
+checksum=679623491ec3b6fd180ce976d5e7ce67336b470b5029d207621c023716c1b95a
 conflicts="runit-void>=0 dinit-void-core>=0"
 make_dirs="/etc/dinit.d/boot.d 0755 root root"
 
